@@ -1,0 +1,107 @@
+GCCcore/11.3.0
+zlib/1.2.12-GCCcore-11.3.0
+binutils/2.38-GCCcore-11.3.0
+GCC/11.3.0
+numactl/2.0.14-GCCcore-11.3.0
+XZ/5.2.5-GCCcore-11.3.0
+libxml2/2.9.13-GCCcore-11.3.0
+libpciaccess/0.16-GCCcore-11.3.0
+hwloc/2.7.1-GCCcore-11.3.0
+OpenSSL/1.1
+libevent/2.1.12-GCCcore-11.3.0
+UCX/1.12.1-GCCcore-11.3.0
+libfabric/1.15.1-GCCcore-11.3.0
+PMIx/4.1.2-GCCcore-11.3.0
+UCC/1.0.0-GCCcore-11.3.0
+OpenMPI/4.1.4-GCC-11.3.0
+OpenBLAS/0.3.20-GCC-11.3.0
+FlexiBLAS/3.2.0-GCC-11.3.0
+FFTW/3.3.10-GCC-11.3.0
+gompi/2022a
+FFTW.MPI/3.3.10-gompi-2022a
+ScaLAPACK/2.2.0-gompi-2022a-fb
+foss/2022a
+CUDA/11.7.0
+bzip2/1.0.8-GCCcore-11.3.0
+ncurses/6.3-GCCcore-11.3.0
+libreadline/8.1.2-GCCcore-11.3.0
+ncurses/6.3-GCCcore-11.3.0
+Tcl/8.6.12-GCCcore-11.3.0
+SQLite/3.38.3-GCCcore-11.3.0
+GMP/6.2.1-GCCcore-11.3.0
+libffi/3.4.2-GCCcore-11.3.0
+Python/3.10.4-GCCcore-11.3.0
+pybind11/2.9.2-GCCcore-11.3.0
+SciPy-bundle/2022.05-foss-2022a
+libyaml/0.2.5-GCCcore-11.3.0
+PyYAML/6.0-GCCcore-11.3.0
+Ninja/1.10.2-GCCcore-11.3.0
+protobuf/3.19.4-GCCcore-11.3.0
+protobuf-python/3.19.4-GCCcore-11.3.0
+MPFR/4.1.0-GCCcore-11.3.0
+NASM/2.15.05-GCCcore-11.3.0
+x264/20220620-GCCcore-11.3.0
+LAME/3.100-GCCcore-11.3.0
+x265/3.5-GCCcore-11.3.0
+expat/2.4.8-GCCcore-11.3.0
+libpng/1.6.37-GCCcore-11.3.0
+Brotli/1.0.9-GCCcore-11.3.0
+freetype/2.12.1-GCCcore-11.3.0
+util-linux/2.38-GCCcore-11.3.0
+fontconfig/2.14.0-GCCcore-11.3.0
+freetype/2.12.1-GCCcore-11.3.0
+xorg-macros/1.19.3-GCCcore-11.3.0
+X11/20220504-GCCcore-11.3.0
+freetype/2.12.1-GCCcore-11.3.0
+fontconfig/2.14.0-GCCcore-11.3.0
+FriBidi/1.0.12-GCCcore-11.3.0
+FFmpeg/4.4.2-GCCcore-11.3.0
+libjpeg-turbo/2.1.3-GCCcore-11.3.0
+jbigkit/2.1-GCCcore-11.3.0
+gzip/1.12-GCCcore-11.3.0
+lz4/1.9.3-GCCcore-11.3.0
+zstd/1.5.2-GCCcore-11.3.0
+libdeflate/1.10-GCCcore-11.3.0
+LibTIFF/4.3.0-GCCcore-11.3.0
+Pillow/9.1.1-GCCcore-11.3.0
+cuDNN/8.4.1.50-CUDA-11.7.0
+GDRCopy/2.3-GCCcore-11.3.0
+UCX-CUDA/1.12.1-GCCcore-11.3.0-CUDA-11.7.0
+magma/2.6.2-foss-2022a-CUDA-11.7.0
+NCCL/2.12.12-GCCcore-11.3.0-CUDA-11.7.0
+expecttest/0.1.3-GCCcore-11.3.0
+PyTorch/1.12.1-foss-2022a-CUDA-11.7.0
+tqdm/4.64.0-GCCcore-11.3.0
+Transformers/4.24.0-foss-2022a-CUDA-11.7.0
+ICU/71.1-GCCcore-11.3.0
+Boost/1.79.0-GCC-11.3.0
+snappy/1.1.9-GCCcore-11.3.0
+RapidJSON/1.1.0-GCCcore-11.3.0
+RE2/2022-06-01-GCCcore-11.3.0
+utf8proc/2.7.0-GCCcore-11.3.0
+Arrow/8.0.0-foss-2022a
+Tk/8.6.12-GCCcore-11.3.0
+Tkinter/3.10.4-GCCcore-11.3.0
+Qhull/2020.2-GCCcore-11.3.0
+matplotlib/3.5.2-foss-2022a
+polars/0.17.12-foss-2022a
+poetry/1.2.2-GCCcore-11.3.0
+aiohttp/3.8.3-GCCcore-11.3.0
+BeautifulSoup/4.10.0-GCCcore-11.3.0
+deepdiff/5.8.1-GCCcore-11.3.0
+tensorboardX/2.5.1-foss-2022a
+PyTorch-Lightning/1.9.3-foss-2022a-CUDA-11.7.0
+Hydra/1.3.2-GCCcore-11.3.0
+scikit-learn/1.1.2-foss-2022a
+sklearn-pandas/2.2.0-foss-2022a
+/rds/projects/g/gokhalkm-optimal/DataforCharles
+/rds/projects/g/gokhalkm-optimal/DataforCharles
+dumb
+icelake
+/rds/homes/g/gaddcz/Projects/CPRD/virtual-env-icelake
+Build CPRD.db database from Version 3 of DeXTER output
+Added path '/rds/homes/g/gaddcz/Projects/CPRD/virtual-env-icelake/lib/python3.10/site-packages' at start of search paths.
+Using device: cuda.
+Adding ACE_Inhibitors_D2T                                             : 0it [00:00, ?it/s]INFO:root:Used event_date_col EVENT_DATE, and event_value_col value
+INFO:root:Selected from available columns ['PRACTICE_PATIENT_ID', 'INDEX_DATE', 'EXIT_DATE', 'ACE_INHIBITORS_D2T', 'EVENT_DATE']
+Adding ACE_Inhibitors_D2T                                             : 1it [00:01,  1.94s/it]Adding ACE_Inhibitors_D2T                                             : 2it [00:04,  2.02s/it]Adding ACE_Inhibitors_D2T                                             : 3it [00:06,  2.10s/it]Adding ACE_Inhibitors_D2T                                             : 4it [00:08,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 5it [00:10,  2.03s/it]Adding ACE_Inhibitors_D2T                                             : 6it [00:12,  2.09s/it]Adding ACE_Inhibitors_D2T                                             : 7it [00:14,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 8it [00:16,  2.09s/it]Adding ACE_Inhibitors_D2T                                             : 9it [00:18,  2.04s/it]Adding ACE_Inhibitors_D2T                                             : 10it [00:20,  2.14s/it]Adding ACE_Inhibitors_D2T                                             : 11it [00:23,  2.15s/it]Adding ACE_Inhibitors_D2T                                             : 12it [00:25,  2.14s/it]Adding ACE_Inhibitors_D2T                                             : 13it [00:27,  2.13s/it]Adding ACE_Inhibitors_D2T                                             : 14it [00:29,  2.08s/it]Adding ACE_Inhibitors_D2T                                             : 15it [00:31,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 16it [00:32,  1.96s/it]Adding ACE_Inhibitors_D2T                                             : 17it [00:35,  2.00s/it]Adding ACE_Inhibitors_D2T                                             : 18it [00:37,  2.03s/it]Adding ACE_Inhibitors_D2T                                             : 19it [00:39,  2.09s/it]Adding ACE_Inhibitors_D2T                                             : 20it [00:41,  2.11s/it]Adding ACE_Inhibitors_D2T                                             : 21it [00:43,  2.12s/it]Adding ACE_Inhibitors_D2T                                             : 22it [00:45,  2.12s/it]Adding ACE_Inhibitors_D2T                                             : 23it [00:47,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 24it [00:49,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 25it [00:51,  2.09s/it]Adding ACE_Inhibitors_D2T                                             : 26it [00:54,  2.11s/it]Adding ACE_Inhibitors_D2T                                             : 27it [00:56,  2.09s/it]Adding ACE_Inhibitors_D2T                                             : 28it [00:58,  2.07s/it]Adding ACE_Inhibitors_D2T                                             : 29it [01:00,  2.04s/it]Adding ACE_Inhibitors_D2T                                             : 30it [01:02,  2.03s/it]Adding ACE_Inhibitors_D2T                                             : 31it [01:04,  2.02s/it]Adding ACE_Inhibitors_D2T                                             : 32it [01:06,  2.03s/it]Adding ACE_Inhibitors_D2T                                             : 33it [01:08,  2.03s/it]Adding ACE_Inhibitors_D2T                                             : 34it [01:10,  2.02s/it]Adding ACE_Inhibitors_D2T                                             : 35it [01:12,  2.09s/it]Adding ACE_Inhibitors_D2T                                             : 36it [01:14,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 37it [01:16,  2.06s/it]Adding ACE_Inhibitors_D2T                                             : 38it [01:18,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 39it [01:20,  2.13s/it]Adding ACE_Inhibitors_D2T                                             : 40it [01:22,  2.11s/it]Adding ACE_Inhibitors_D2T                                             : 41it [01:24,  2.11s/it]Adding ACE_Inhibitors_D2T                                             : 42it [01:27,  2.18s/it]Adding ACE_Inhibitors_D2T                                             : 43it [01:29,  2.11s/it]Adding ACE_Inhibitors_D2T                                             : 44it [01:31,  2.13s/it]Adding ACE_Inhibitors_D2T                                             : 45it [01:33,  2.09s/it]Adding ACE_Inhibitors_D2T                                             : 46it [01:35,  2.08s/it]Adding ACE_Inhibitors_D2T                                             : 47it [01:37,  2.06s/it]Adding ACE_Inhibitors_D2T                                             : 48it [01:39,  2.04s/it]Adding ACE_Inhibitors_D2T                                             : 49it [01:41,  2.18s/it]Adding ACE_Inhibitors_D2T                                             : 50it [01:44,  2.16s/it]Adding ACE_Inhibitors_D2T                                             : 51it [01:46,  2.15s/it]Adding ACE_Inhibitors_D2T                                             : 52it [01:48,  2.07s/it]Adding ACE_Inhibitors_D2T                                             : 53it [01:50,  2.05s/it]Adding ACE_Inhibitors_D2T                                             : 54it [01:52,  2.16s/it]Adding ACE_Inhibitors_D2T                                             : 55it [01:54,  2.12s/it]Adding ACE_Inhibitors_D2T                                             : 56it [01:56,  2.16s/it]
