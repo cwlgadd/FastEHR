@@ -13,9 +13,9 @@ from textwrap import wrap
 from typing import Optional
 from collections import defaultdict
 import os
-from SurvivEHR.SurvivEHR_ExampleData.dataloader.dataset.dataset_polars import PolarsDataset
-from SurvivEHR.SurvivEHR_ExampleData.dataloader.tokenizers.base import TokenizerBase
-from SurvivEHR.SurvivEHR_ExampleData.dataloader.tokenizers.tokenizers import NonTabular, Tabular
+from FastEHR.dataloader.dataset.dataset_polars import PolarsDataset
+from FastEHR.dataloader.tokenizers.base import TokenizerBase
+from FastEHR.dataloader.tokenizers.tokenizers import NonTabular, Tabular
 import random
 import logging
 from pathlib import Path
@@ -24,7 +24,7 @@ import pickle
 import copy
 
 # Testing modules
-from SurvivEHR.SurvivEHR_ExampleData.database import queries
+from FastEHR.database import queries
 import sqlite3
 
 import time

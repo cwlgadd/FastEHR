@@ -1,6 +1,6 @@
 import sqlite3
 import polars as plr
-from SurvivEHR.SurvivEHR_ExampleData.dataloader.tokenizers.base import TokenizerBase
+from FastEHR.dataloader.tokenizers.base import TokenizerBase
 import logging
 
 class NonTabular(TokenizerBase):

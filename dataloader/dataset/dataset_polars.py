@@ -10,7 +10,7 @@ import pyarrow.parquet as pq
 import pyarrow.dataset as ds
 import pickle
 import numpy as np
-from SurvivEHR.SurvivEHR_ExampleData.dataloader.dataset.collector import SQLiteDataCollector
+from FastEHR.dataloader.dataset.collector import SQLiteDataCollector
 from sklearn.model_selection import train_test_split as sk_split
 import logging
 from tqdm import tqdm
