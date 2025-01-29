@@ -4,9 +4,9 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Any, Union, Callable
 import logging
-from SurvivEHR.SurvivEHR_ExampleData.database.build_static_table import Static
-from SurvivEHR.SurvivEHR_ExampleData.database.build_diagnosis_table import Diagnoses
-from SurvivEHR.SurvivEHR_ExampleData.database.build_valued_event_tables import Measurements
+from FastEHR.database.build_static_table import Static
+from FastEHR.database.build_diagnosis_table import Diagnoses
+from FastEHR.database.build_valued_event_tables import Measurements
 from tqdm import tqdm
 from tdigest import TDigest
 

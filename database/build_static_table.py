@@ -6,32 +6,6 @@ from datetime import datetime
 from dateutil import relativedelta
 import logging
 
-# class StaticDB:
-#     """A sample static observations class"""
-
-#     def __init__(self, identifier, sex, ethnicity, year_of_birth):
-#         self.identifier = identifier
-#         self.sex = sex
-#         self.ethnicity = ethnicity
-#         self.age = year_of_birth
-
-#     # def __repr__(self):
-#     #     return "Employee('{}', '{}', {})".format(self.first, self.last, self.pay)
-    
-
-# def get_static_by_PPID(identifier, cursor):
-#     cursor.execute("SELECT * FROM static_table WHERE PRACTICE_PATIENT_ID=:PRACTICE_PATIENT_ID", {'PRACTICE_PATIENT_ID': identifier})
-#     return cursor.fetchall()
-
-
-# def insert_patient(patient, cursor):
-#     with conn:
-#         cursor.execute("INSERT INTO static_table VALUES (:PRACTICE_PATIENT_ID, :SEX, :ETHNICITY, :YEAR_OF_BIRTH)", 
-#                        {'PRACTICE_PATIENT_ID': patient.identifier,
-#                         'SEX': patient.sex, 
-#                         'ETHNICITY': patient.ethnicity, 
-#                         'YEAR_OF_BIRTH': patient.age})
-
 class Static():
 
     # @staticmethod

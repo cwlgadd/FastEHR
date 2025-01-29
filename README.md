@@ -27,6 +27,8 @@ git clone https://github.com/cwlgadd/FastEHR.git
 cd FastEHR
 ```
 
+Ensure the directory FastEHR is added to is on your PythonPath.
+
 **2️⃣ Install Dependencies**
 Ensure you have Python >=3.8 and install required packages:
 ```
@@ -54,6 +56,11 @@ The `examples/` folder contains:
     📌 creating a dataset → Extracts data from SQLite & generates a deep learning dataset.
     📌 TODO: creating an indexed dataset with outcomes → 
   
+---
+## 🔡 EHR Event Tokenization
+
+Tokenization converts raw EHR events into structured representations for deep learning models.
+This allows EHR sequences to be used in transformer models, RNNs, or sequence-based ML models.
 
 
 

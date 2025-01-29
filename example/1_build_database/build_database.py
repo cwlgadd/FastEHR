@@ -22,9 +22,9 @@ import matplotlib.pyplot as plt
 import random
 import sqlite3
 import logging
-from SurvivEHR.SurvivEHR_ExampleData.database.build_static_table import Static
-from SurvivEHR.SurvivEHR_ExampleData.database.build_diagnosis_table import Diagnoses
-from SurvivEHR.SurvivEHR_ExampleData.database.build_valued_event_tables import Measurements
+from FastEHR.database.build_static_table import Static
+from FastEHR.database.build_diagnosis_table import Diagnoses
+from FastEHR.database.build_valued_event_tables import Measurements
 
 if __name__ == "__main__":
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}.")
 
-    path_to_directory = "/home/ubuntu/Documents/GitHub/SurvivEHR/SurvivEHR_ExampleData/example/data/"
+    path_to_directory = "/home/ubuntu/Documents/GitHub/SurvivEHR/FastEHR/example/data/"
 
     PATH_TO_DB = path_to_directory + "_built/example_database.db"
     PATH_TO_STATIC = path_to_directory + "baseline/static_data.csv"
