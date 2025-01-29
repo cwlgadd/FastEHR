@@ -22,16 +22,23 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
         self.cursor = None
 
     def connect(self):
-        try:
-            self.connection = sqlite3.connect(self.db_path, timeout=20000)
-            self.cursor = self.connection.cursor()
-            logging.debug("Connected to SQLite database")
-        except sqlite3.Error as e:
-            logging.warning(f"Error connecting to SQLite database: {e}")
+        """Establish the SQLite database connection."""
+        if self.connection is None:
+            try:
+                self.connection = sqlite3.connect(self.db_path, timeout=20000)
+                self.cursor = self.connection.cursor()
+                logging.debug("Connected to SQLite database")
+            except sqlite3.Error as e:
+                logging.exception(f"Error connecting to SQLite database: {e}")
+        else:
+            logging.debug("Connection already established.")
 
     def disconnect(self):
+        """Close the SQLite database connection."""
         if self.connection:
             self.connection.close()
+            self.connection = None
+            self.cursor = None
             logging.debug("Disconnected from SQLite database")
 
     def _extract_distinct(self,
@@ -137,8 +144,7 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
                 fetches_count += 1
             except:
                 logging.warning(f"Unable to batch update t-digest for values {values} from {table_name}, skipping batch")
-                pass 
-                
+
         return digest
     
     def _generate_lazy_by_distinct(self,
