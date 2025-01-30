@@ -268,6 +268,10 @@ class PolarsDataset:
             save_path (str): Path where the parquet files will be stored.
             collector (SQLiteDataCollector): The **SQLite connection assigned to this thread**.
         """
+
+        # Ensure the collector's connection is open (for safety in multi-threading)
+        collector.connect()  # If already connected (i.e. persistent connection), this is a no-op
+
         # Create the generator, which returns the table contents of qualifying practices one at a time
         # Can process entire list of IDs at once by changing to `distinct_values=[split_ids]`
         practice_generator = collector._generate_lazy_by_distinct(distinct_values=split_ids,
@@ -276,14 +280,11 @@ class PolarsDataset:
                                                                   include_measurements=include_measurements,
                                                                   )
 
+        desc = f"Thread generating parquet for {len(split_ids)} practices"
         total_samples = 0
-        for chunk_name, lazy_table_frames_dict in tqdm(practice_generator, total=len(split_ids)):
-
+        for chunk_name, lazy_table_frames_dict in tqdm(practice_generator, total=len(split_ids), desc=desc):
 
             logging.debug(f"Processing {chunk_name}")
-
-            # Ensure the collector's connection is open (for safety in multi-threading)
-            collector.connect()  # If already connected (i.e. persistent connection), this is a no-op
 
             try:
                 # Merge the lazy polars tables provided by the generator into one lazy polars frame
