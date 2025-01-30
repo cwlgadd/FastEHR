@@ -1,6 +1,17 @@
-# 📂 Examples
+# 📑 Examples
 
-The `examples/` folder contains:
+This folder contains an example workflow.
+
+---
+
+## 📂 Data Directory Structure
+
+| **Folder** | **Description** |
+|------------|----------------|
+| `data/baseline/` | Stores raw **CSV files** before conversion to SQLite. |
+| `data/diagnoses/` | " |
+| `data/timeseries/measurement_tests_medications/` | " |
+| `data/built_/` | Contains the **SQLite database** and **PyTorch dataset** in **processed Parquet files**  after conversion. |
 
 ---
 
@@ -16,3 +27,6 @@ Using the SQLite database, construct a linked Dataset ready for GPU processing.
 
     📌 creating a dataset → Extracts data from SQLite & generates a deep learning dataset.
     📌 TODO: creating an indexed dataset with outcomes → 
+
+---
+
