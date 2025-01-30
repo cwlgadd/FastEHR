@@ -49,13 +49,21 @@ Splits across datasets can be linked by shared origins (for exmaple General Prac
 
 The `examples/` folder contains:
 
-1️⃣ Building the SQLite database → Convert your .CSV files into an indexed SQLite database for fast querying
+1️⃣ Building the SQLite database 
 
-2️⃣ Building ML-ready Dataloaders → Using the SQLite database, construct a linked Dataset ready for GPU processing.
+Convert your .CSV files into an indexed SQLite database for fast querying
 
-    📌 creating a dataset → Extracts data from SQLite & generates a deep learning dataset.
-    📌 TODO: creating an indexed dataset with outcomes → 
-  
+2️⃣ Building ML-ready dataloaders 
+
+Using the SQLite database, construct a linked dataset ready for GPU processing.
+
+    📌 Extracts data from SQLite & generates a deep learning dataset.
+     
+3️⃣ Building ML-ready dataloaders for Clinical Prediction Models
+
+    📌 Indexed on different criteria
+    📌 With processing for various target outcomes
+
 ---
 ## 🔡 EHR Event Tokenization
 
