@@ -19,7 +19,10 @@ import os
 from joblib import Parallel, delayed
 
 class PolarsDataset:
-    
+    """
+
+    """
+
     def __init__(self, path_to_db):
         """Initialize the dataset and establish a connection to the database."""
         super().__init__()
@@ -27,7 +30,8 @@ class PolarsDataset:
         self.path_to_db = path_to_db
         self.collector = SQLiteDataCollector(self.path_to_db)
         self.collector.connect()           # Persistent connection
-        
+
+
     def fit(self,
             path:                                str,
             practice_inclusion_conditions:       Optional[list[str]] = None,
@@ -91,7 +95,7 @@ class PolarsDataset:
         try:
             # Train, test, validation split
             if overwrite_practice_ids is None:
-                self.train_practice_ids, self.val_practice_ids, self.test_practice_ids = self._train_test_val_split(
+                self.train_practice_ids, self.val_practice_ids, self.test_practice_ids = self.__train_test_val_split(
                     practice_inclusion_conditions=practice_inclusion_conditions
                 )
                 splits = {"train": self.train_practice_ids, "val": self.val_practice_ids, "test": self.test_practice_ids}
@@ -106,7 +110,7 @@ class PolarsDataset:
                     self.test_practice_ids = splits["test"]
                     logging.info(f"Using train/test/val splits from {overwrite_practice_ids}")
 
-            # Collect meta information.
+            # Collect meta information (single-threaded).
             #    These are pre-calculations, used for torch loader length, tokenization, and standardisation
             if overwrite_meta_information is None:
                 # all_train = list(itertools.chain.from_iterable(self.train_practice_ids))
@@ -118,7 +122,7 @@ class PolarsDataset:
                 with open(self.save_path + f'meta_information.pickle', 'wb') as handle:
                     pickle.dump(meta_information, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-            # Process splits in parallel
+            # Process splits in parallel, chunking by practice
             #   Looping over practice IDs
             #    * create the generator that performs a lookup on the database for each practice ID and returns a lazy frame for each table's rows
             #    * collating the lazy tables into a lazy DL-friendly representation,
@@ -129,21 +133,46 @@ class PolarsDataset:
                 assert not any(path.iterdir()), f"Expected empty directory {path}, but found {[_ for _ in path.iterdir()]}"
 
                 logging.info(f"Processing {split_name} split...")
-                self._write_parquet_dl_dataset(
+                self.__save_data_to_parquet(
                     save_path=path, split_ids=split_ids, include_diagnoses=include_diagnoses,
                     include_measurements =include_measurements, num_threads=num_threads, **kwargs
                 )
 
                 # Index dataset for faster lookups
                 logging.info(f"Creating file_row_count_dicts for file-index look-ups")
-                hashmap = self._get_file_row_counts(path)
+                hashmap = self.__index_parquet_file_rows(path)
                 with open(self.save_path + f'file_row_count_dict_{split_name}.pickle', 'wb') as handle:
                     pickle.dump(hashmap, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
         finally:
             self.collector.disconnect()  # Ensure database is closed properly
 
-    def _train_test_val_split(self, practice_inclusion_conditions=None):
-        
+
+    def __train_test_val_split(self, practice_inclusion_conditions=None):
+        """
+        Splits the dataset into training, validation, and test sets based on unique practice IDs.
+
+        This method retrieves a list of distinct `PRACTICE_ID`s from the database, optionally
+        filtering them based on the provided inclusion conditions. It then performs a
+        stratified split into training (90%), validation (5%), and test (5%) subsets.
+
+        Args:
+            practice_inclusion_conditions (Optional[list[str]]):
+                A list of SQL conditions to filter practices before splitting.
+                Example: ["COUNTRY = 'E'"] to include only practices from England.
+
+        Returns:
+            tuple:
+                - train_practice_ids (list[str]): Practice IDs allocated for training.
+                - val_practice_ids (list[str]): Practice IDs allocated for validation.
+                - test_practice_ids (list[str]): Practice IDs allocated for testing.
+
+        Notes:
+            - If `practice_inclusion_conditions` is `None`, all practice IDs are used.
+            - Uses `sklearn.model_selection.train_test_split` to randomly partition the data.
+              further split into equal validation and test sets (5% each).
+        """
+
         # get a list of practice IDs which are used to chunk the database
         #    We can optionally subset which practice IDs should be included in the study based on some criteria.
         #    For example, asserting that we only want practices in England can be achieved by adding an inclusion
@@ -158,15 +187,71 @@ class PolarsDataset:
         logging.info(f"Creating train/test/val splits using practice_ids")
         train_practice_ids, test_practice_ids = sk_split(practice_ids, test_size=0.1)
         test_practice_ids, val_practice_ids = sk_split(test_practice_ids, test_size=0.5)
+
         return train_practice_ids, val_practice_ids, test_practice_ids
 
-    def _write_lazy_to_parquet_dl(self,
-                                  lazy_table_frames_dict,
-                                  chunk_name,
-                                  save_path:str,
-                                  collector,
-                                  **kwargs,
-                                 ):
+    def __save_data_to_parquet(self,
+                               save_path: str,
+                               split_ids: list[str],
+                               include_diagnoses: bool = True,
+                               include_measurements: bool = True,
+                               num_threads: int = 1,
+                               **kwargs,
+                               ) -> pl.LazyFrame:
+        r"""
+        Saves extracted practice data as a Polars dataset in Parquet format.
+
+        Each thread processes one practice ID at a time using its own database connection
+        and generator for thread safety.
+
+        Writes the dataset to Parquet using a persistent connection.
+            - Uses a **separate connection per thread** for multi-threading.
+            - **Reuses the persistent connection** when running in a single-threaded mode.
+
+        ARGS:
+
+        KWARGS:
+
+        """
+        logging.debug(f"Generating dataset over practice IDs")
+
+        # Single-threaded execution: Use the persistent SQLite connection
+        if num_threads == 1:
+
+            # Using persistent collector, loop over all split_ids and create parquet dataset
+            total_samples = self.__save_split_data_to_parquet(
+                split_ids, save_path=save_path,collector=self.collector, **kwargs
+            )
+
+
+        # Multi-threaded execution: Create a separate SQLite connection per thread
+        elif num_threads > 1:
+
+            # **Split the workload**: Assign each thread a subset of practice IDs
+            split_batches = np.array_split(split_ids, num_threads)
+
+            # Using thread safe collectors, in each thread loop over the sub-batch of split_ids and create parquet
+            Parallel(n_jobs=num_threads, prefer="threads", verbose=10)(
+                delayed(self.__save_split_data_to_parquet)(
+                    split_ids_thread, save_path=save_path, collector=SQLiteDataCollector(self.path_to_db), **kwargs
+                )
+                for split_ids_thread in split_batches)
+
+            total_samples = f"unknown (multi-threaded processing)"
+
+        else:
+            raise NotImplementedError
+
+        logging.info(f"Created dataset at {save_path} with {total_samples} number of samples")
+
+        return
+
+    def __save_split_data_to_parquet(self,
+                                     split_ids,
+                                     save_path:str,
+                                     collector,
+                                     **kwargs,
+                                    ):
         """
         Writes a chunk of data to Parquet using a **thread-safe SQLite connection**.
             save splits with a hive partitioning
@@ -177,100 +262,58 @@ class PolarsDataset:
             save_path (str): Path where the parquet files will be stored.
             collector (SQLiteDataCollector): The **SQLite connection assigned to this thread**.
         """
-        
-        logging.debug(f"Processing {chunk_name}")
-
-        # Ensure the collector's connection is open (for safety in multi-threading)
-        collector.connect()  # If already connected (i.e. persistent connection), this is a no-op
-
-        try:
-            # Merge the lazy polars tables provided by the generator into one lazy polars frame
-            lazy_batch = collector._collate_lazy_tables(lazy_table_frames_dict, **kwargs)
-
-            # TODO: make directories if they dont already exist
-
-            # Collect the lazy Polars frame, materializing the batch
-            #   include row count so we can filter when reading from file
-            df = lazy_batch.collect().with_row_count().to_pandas()  # offset=total_samples
-            total_samples = len(df.index)
-        
-            if total_samples > 0:
-                # Convert row count to lower cardinality bins for efficient partitioning
-                # ... the smaller the window the more files created + storage space used, and the longer this takes to run
-                # ... but the faster the read efficiency.
-                df = df.assign(CHUNK = [int(_v / 250) for _v in df['row_nr']])
-
-                # Convert to an Apache Arrow Table and save to a partitioned Parquet dataset
-                table = pa.Table.from_pandas(df)
-                pq.write_to_dataset(table, root_path=save_path, partition_cols=['COUNTRY', 'HEALTH_AUTH', 'PRACTICE_ID', 'CHUNK'])
-
-                logging.debug(f'Saved {total_samples} rows for chunk {chunk_name}')
-                # logging.debug(f'{df.iloc[0]["COUNTRY"]}, {df.iloc[0]["HEALTH_AUTH"]}, {df.iloc[0]["PRACTICE_ID"]}')
-
-        except Exception as e:
-            logging.exception(f"Error processing {chunk_name}: {e}")
-
-        finally:
-            if isinstance(collector, SQLiteDataCollector) and collector is not self.collector:
-                collector.disconnect()  # Close connection after processing if multi-threaded mode
-
-            logging.debug(f"Finished processing {chunk_name}")
-
-        return total_samples
-    
-    def _write_parquet_dl_dataset(self,
-                                  save_path:               str,
-                                  split_ids:               list[str],
-                                  include_diagnoses:       bool = True,
-                                  include_measurements:    bool = True,
-                                  num_threads:             int = 1,
-                                  **kwargs,
-                                 ) -> pl.LazyFrame:
-        r"""
-        Build the DL-friendly representation in polars given the list of `practice_patient_id`s which fit study criteria
-
-        Writes the dataset to Parquet using a persistent connection.
-            - Uses a **separate connection per thread** for multi-threading.
-            - **Reuses the persistent connection** when running in a single-threaded mode.
-
-        ARGS:
-            
-        KWARGS:
-        
-        """
-        logging.debug(f"Generating dataset over practice IDs")
-
         # Create the generator, which returns the table contents of qualifying practices one at a time
         # Can process entire list of IDs at once by changing to `distinct_values=[split_ids]`
-        practice_generator = self.collector._generate_lazy_by_distinct(distinct_values=split_ids,                            
-                                                                       identifier_column="PRACTICE_ID",
-                                                                       include_diagnoses=include_diagnoses,
-                                                                       include_measurements=include_measurements,
-                                                                       )
+        practice_generator = collector._generate_lazy_by_distinct(distinct_values=split_ids,
+                                                                  identifier_column="PRACTICE_ID",
+                                                                  include_diagnoses=include_diagnoses,
+                                                                  include_measurements=include_measurements,
+                                                                  )
 
-        # Multi-threaded execution: Create a separate SQLite connection per thread
-        if num_threads > 1:
-            Parallel(n_jobs=num_threads, prefer="threads", verbose=10)(
-                delayed(self._write_lazy_to_parquet_dl)(
-                    lazy_table_frames_dict, chunk_name, save_path=save_path,
-                    collector=SQLiteDataCollector(self.path_to_db), **kwargs
-                )
-                for chunk_name, lazy_table_frames_dict in practice_generator)
+        total_samples = 0
+        for chunk_name, lazy_table_frames_dict in tqdm(practice_generator, total=len(split_ids)):
 
-        elif num_threads == 1:
-            total_samples = 0
-            for _idx, (chunk_name, lazy_table_frames_dict) in enumerate(tqdm(practice_generator, total=len(split_ids))):
-                total_samples += self._write_lazy_to_parquet_dl(
-                    lazy_table_frames_dict, chunk_name, save_path=save_path,
-                    collector=self.collector, **kwargs)
-    
-            logging.info(f"Created dataset at {save_path} with {total_samples:,} samples")
-        else:
-            raise NotImplementedError
-        
-        return 
 
-    def _get_file_row_counts(self, parquet_path):
+            logging.debug(f"Processing {chunk_name}")
+
+            # Ensure the collector's connection is open (for safety in multi-threading)
+            collector.connect()  # If already connected (i.e. persistent connection), this is a no-op
+
+            try:
+                # Merge the lazy polars tables provided by the generator into one lazy polars frame
+                lazy_batch = collector._collate_lazy_tables(lazy_table_frames_dict, **kwargs)
+
+                # TODO: make directories if they dont already exist
+
+                # Collect the lazy Polars frame, materializing the batch
+                #   include row count so we can filter when reading from file
+                df = lazy_batch.collect().with_row_count().to_pandas()  # offset=total_samples
+                total_samples = len(df.index)
+
+                if total_samples > 0:
+                    # Convert row count to lower cardinality bins for efficient partitioning
+                    # ... the smaller the window the more files created + storage space used, and the longer this takes to run
+                    # ... but the faster the read efficiency.
+                    df = df.assign(CHUNK = [int(_v / 250) for _v in df['row_nr']])
+
+                    # Convert to an Apache Arrow Table and save to a partitioned Parquet dataset
+                    table = pa.Table.from_pandas(df)
+                    pq.write_to_dataset(table, root_path=save_path, partition_cols=['COUNTRY', 'HEALTH_AUTH', 'PRACTICE_ID', 'CHUNK'])
+
+                    logging.debug(f'Saved {total_samples} rows for chunk {chunk_name}')
+
+            except Exception as e:
+                logging.exception(f"Error processing {chunk_name}: {e}")
+
+            finally:
+                if isinstance(collector, SQLiteDataCollector) and collector is not self.collector:
+                    collector.disconnect()  # Close connection after processing if multi-threaded mode
+
+                logging.debug(f"Finished processing {chunk_name}")
+
+        return total_samples
+
+    def __index_parquet_file_rows(self, parquet_path):
         # Get all files at specified path, and extract from meta data how many samples are in each file. This allows for for faster reading during calls to dataset
         file_row_counts = {}
         desc = "Getting file row counts. This allows the creation of an index to file map, increasing read efficiency"

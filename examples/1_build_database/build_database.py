@@ -22,6 +22,8 @@ if __name__ == "__main__":
     path_to_directory = os.getcwd() + "/../data/"
 
     PATH_TO_DB = path_to_directory + "_built/example_database.db"
+    print(f"Saving databse to {PATH_TO_DB}")
+
     PATH_TO_STATIC = path_to_directory + "baseline/static_data.csv"
     PATH_TO_DIAGNOSIS = path_to_directory + "diagnoses/diagnosis_data.csv"
     PATH_TO_DYNAMIC = path_to_directory + "timeseries/measurement_tests_medications/"
