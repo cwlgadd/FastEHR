@@ -1,20 +1,6 @@
 import os
 from pathlib import Path
 import sys
-node_type = os.getenv('BB_CPU')
-venv_dir = f'/rds/homes/g/gaddcz/Projects/CPRD/virtual-env-{node_type}'
-venv_site_pkgs = Path(venv_dir) / 'lib' / f'python{sys.version_info.major}.{sys.version_info.minor}' / 'site-packages'
-if venv_site_pkgs.exists():
-    sys.path.insert(0, str(venv_site_pkgs))
-    print(f"Added path '{venv_site_pkgs}' at start of search paths.")
-else:
-    print(f"Path '{venv_site_pkgs}' not found. Check that it exists and/or that it exists for node-type '{node_type}'.")
-
-
-# !echo $SQLITE_TMPDIR
-# !echo $TMPDIR
-# !echo $USERPROFILE
-
 import pytorch_lightning
 import torch
 import numpy as np
@@ -33,7 +19,7 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}.")
 
-    path_to_directory = "/home/ubuntu/Documents/GitHub/SurvivEHR/FastEHR/example/data/"
+    path_to_directory = os.getcwd() + "/../data/"
 
     PATH_TO_DB = path_to_directory + "_built/example_database.db"
     PATH_TO_STATIC = path_to_directory + "baseline/static_data.csv"
