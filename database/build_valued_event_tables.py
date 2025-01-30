@@ -68,7 +68,7 @@ class Measurements():
         s += "\nTotal".ljust(40) + f"& {total_count}"
         
         return s
-        
+
     def connect(self):
         try:
             self.connection = sqlite3.connect(self.db_path)
@@ -105,7 +105,7 @@ class Measurements():
             self.connection.commit()
             
         self.disconnect()
-    
+
     def _create_measurement_partition(self, measurement_name):
         
         self.cursor.execute("""DROP TABLE IF EXISTS measurement_""" + measurement_name)
