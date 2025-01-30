@@ -280,13 +280,14 @@ class PolarsDataset:
                                                                   include_measurements=include_measurements,
                                                                   )
 
-        desc = f"Thread generating parquet for {len(split_ids)} practices"
-        total_samples = 0
-        for chunk_name, lazy_table_frames_dict in tqdm(practice_generator, total=len(split_ids), desc=desc):
+        try:
+            
+            desc = f"Thread generating parquet for {len(split_ids)} practices"
+            total_samples = 0
+            for chunk_name, lazy_table_frames_dict in tqdm(practice_generator, total=len(split_ids), desc=desc):
 
-            logging.debug(f"Processing {chunk_name}")
+                logging.debug(f"Processing {chunk_name}")
 
-            try:
                 # Merge the lazy polars tables provided by the generator into one lazy polars frame
                 lazy_batch = collector._collate_lazy_tables(lazy_table_frames_dict, **kwargs)
 
@@ -307,14 +308,12 @@ class PolarsDataset:
 
                     logging.debug(f'Saved {total_samples} rows for chunk {chunk_name}')
 
-            except Exception as e:
-                logging.exception(f"Error processing {chunk_name}: {e}")
+        except Exception as e:
+            logging.exception(f"Error processing {chunk_name}: {e}")
 
-            finally:
-                if isinstance(collector, SQLiteDataCollector) and collector is not self.collector:
-                    collector.disconnect()  # Close connection after processing if multi-threaded mode
-
-                logging.debug(f"Finished processing {chunk_name}")
+        finally:
+            if isinstance(collector, SQLiteDataCollector) and collector is not self.collector:
+                collector.disconnect()  # Close connection after processing if multi-threaded mode
 
         return total_samples
 
