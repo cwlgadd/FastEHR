@@ -129,17 +129,21 @@ class PolarsDataset:
             for split_name, split_ids in zip(["test", "train", "val"],
                                              [self.test_practice_ids, self.train_practice_ids, self.val_practice_ids]):
 
+                logging.info(f"Processing {split_name} split...")
+
+                # Dataset path
                 path = pathlib.Path(self.save_path + f"split={split_name}")    # /{chunk_name}.parquet
                 assert not any(path.iterdir()), f"Expected empty directory {path}, but found {[_ for _ in path.iterdir()]}"
+                # TODO: make directories if they dont already exist
 
-                logging.info(f"Processing {split_name} split...")
+                # Create parquet train/test/val dataset
                 self.__save_data_to_parquet(
                     save_path=path, split_ids=split_ids, include_diagnoses=include_diagnoses,
                     include_measurements =include_measurements, num_threads=num_threads, **kwargs
                 )
 
-                # Index dataset for faster lookups
-                logging.info(f"Creating file_row_count_dicts for file-index look-ups")
+                # Index the dataset for faster lookups
+                logging.debug(f"Creating file_row_count_dicts for file-index look-ups")
                 hashmap = self.__index_parquet_file_rows(path)
                 with open(self.save_path + f'file_row_count_dict_{split_name}.pickle', 'wb') as handle:
                     pickle.dump(hashmap, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -220,9 +224,8 @@ class PolarsDataset:
 
             # Using persistent collector, loop over all split_ids and create parquet dataset
             total_samples = self.__save_split_data_to_parquet(
-                split_ids, save_path=save_path,collector=self.collector, **kwargs
+                save_path, split_ids, include_diagnoses, include_measurements, self.collector, **kwargs
             )
-
 
         # Multi-threaded execution: Create a separate SQLite connection per thread
         elif num_threads > 1:
@@ -233,7 +236,8 @@ class PolarsDataset:
             # Using thread safe collectors, in each thread loop over the sub-batch of split_ids and create parquet
             Parallel(n_jobs=num_threads, prefer="threads", verbose=10)(
                 delayed(self.__save_split_data_to_parquet)(
-                    split_ids_thread, save_path=save_path, collector=SQLiteDataCollector(self.path_to_db), **kwargs
+                    save_path, split_ids_thread, include_diagnoses, include_measurements,
+                    SQLiteDataCollector(self.path_to_db), **kwargs
                 )
                 for split_ids_thread in split_batches)
 
@@ -247,8 +251,10 @@ class PolarsDataset:
         return
 
     def __save_split_data_to_parquet(self,
-                                     split_ids,
-                                     save_path:str,
+                                     save_path:               str,
+                                     split_ids:               list[str],
+                                     include_diagnoses:       bool,
+                                     include_measurements:    bool,
                                      collector,
                                      **kwargs,
                                     ):
@@ -282,8 +288,6 @@ class PolarsDataset:
             try:
                 # Merge the lazy polars tables provided by the generator into one lazy polars frame
                 lazy_batch = collector._collate_lazy_tables(lazy_table_frames_dict, **kwargs)
-
-                # TODO: make directories if they dont already exist
 
                 # Collect the lazy Polars frame, materializing the batch
                 #   include row count so we can filter when reading from file
