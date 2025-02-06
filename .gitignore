@@ -1,0 +1,61 @@
+# Byte-compiled / cached files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+*.venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.eggs/
+
+# Logs and debugging
+logs/
+*.log
+debug.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# System-specific files
+.DS_Store
+Thumbs.db
+
+# Editor-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# Python-specific
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables and secrets
+.env
+*.secret
+
+# pytest cache
+.pytest_cache/
+
+# MyPy cache
+.mypy_cache/
+
+# Coverage reports
+.coverage
+htmlcov/
+cov.xml
+
+# Sphinx documentation
+docs/_build/
+
+# Notebook output
+**/*.nbconvert.ipynb
+**/*.out
+
