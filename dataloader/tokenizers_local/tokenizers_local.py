@@ -1,20 +1,17 @@
 import sqlite3
 import polars as plr
-from CPRD.data.tokenizers.base import TokenizerBase
+from FastEHR.dataloader.tokenizers_local.base import TokenizerBase
 import logging
 
 class NonTabular(TokenizerBase):
-    r"""
-    Tokenizer based on :footcite:t:`gruver2023large` (`link`_).
+    """
+    Tokenizer based on `gruver2023large <https://arxiv.org/abs/2310.07820>`
 
     The simplest, and most naive tokenizer which ignores tabular structure of the data. 
     Events and consequent measurements are treated as subsequent tokens. For example,
     the event and measurement pair ["bmi", 23.3] is tokenised as a sequence
     ["bmi", "2", "3", ".", "3"].
 
-    .. _link: https://arxiv.org/abs/2310.07820
-
-    .. footbibliography::
     """
     is_tabular = False
 

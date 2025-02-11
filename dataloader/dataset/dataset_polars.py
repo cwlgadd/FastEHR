@@ -38,55 +38,64 @@ class PolarsDataset:
             include_static:                      bool = True,
             include_diagnoses:                   bool = True,
             include_measurements:                bool = True,
-            overwrite_practice_ids:              Optional[tuple] = None,    
+            overwrite_practice_ids:              Optional[str] = None,
             overwrite_meta_information:          Optional[str] = None,
             num_threads:                         int = 1,
             **kwargs
            ):
-        r"""
-        Create a Deep Learning-friendly dataset by extracting structured data from SQLite.
+        """
+        Creates a deep-learning-friendly dataset by extracting structured data from an SQLite database.
 
-        Load information from SQL tables into polars frames for each table in chunks. For each chunk
-           * Then combine, align frames, and put into a DL friendly lazy Polars representation
-           * iteratively find normalisation statistics, counts, or any other meta information 
-           * Save polars frames to parquets
-           * Create a hashmap dictionary which allows us to do faster lookups than native PyArrow solutions
+        This function loads information from SQLite tables into Polars frames in chunks and processes them
+        into a format suitable for deep learning models. The processing includes:
+
+        - Loading SQLite data into Polars frames.
+        - Combining and aligning frames into a lazy Polars representation.
+        - Iteratively computing normalization statistics, counts, or other meta-information.
+        - Saving Polars frames to Parquet format.
+        - Creating a hashmap dictionary for fast lookups (faster than native PyArrow solutions).
+        - Splitting data into training, validation, and test sets.
+
+        Parameters
+        ----------
+        path : str
+            Full path to the folder where the Parquet dataset, meta-information, and file lookup pickles will be stored.
+
+        practice_inclusion_conditions : list[str], optional
+            A list of SQL conditions to filter practices when querying the collector.
+            Example: `["COUNTRY = 'E'"]` to include only practices from England.
+
+        include_static : bool, optional, default=True
+            Whether to include static information in the meta-information.
+
+        include_diagnoses : bool, optional, default=True
+            Whether to include diagnoses in the meta-information and the Parquet dataset.
+
+        include_measurements : bool, optional, default=True
+            Whether to include measurements in the meta-information and the Parquet dataset.
+
+        overwrite_practice_ids : str, optional, default=False
+            The path for the file containing practice ID allocations for train/test/validation splits.
+            This is useful for aligning datasets, for example, when creating a fine-tuning dataset from a Foundation
+            Model dataset to prevent data leakage.
+
+        overwrite_meta_information : str, optional
+            If provided, this should be a path to an existing meta-information pickle file.
+            This allows skipping redundant pre-processing when using precomputed quantile bounds for some measurements.
 
 
-        - Loads SQLite data into Polars frames.
-        - Splits data into training, validation, and test sets.
-        - Saves preprocessed data in Parquet format.
-           
-        ARGS:
-            path:  
-                Full path to folder where parquet files containing the Polars dataset, meta information, and file-look up pickles
-            
-        KWARGS:
-            practice_inclusion_conditions:
-                The set of practice inclusion conditions to query against the collector. For example, only include patients from practices where ["COUNTRY = 'E'"]
-            include_static:
-                Whether to include static information in the meta_information
-            include_diagnoses:
-                Whether to include diagnoses in the meta_information, and in the parquet dataset
-            include_measurements
-                Whether to include measurements in the meta_information, and in the parquet dataset
-            overwrite_practice_ids:
-                If you want to overwrite the practice ID allocations to train/test/validation splits, for example if you are building a fine-tuning dataset
-                from within the foundation model dataset you will need to ensure information is not leaked into the test/validation from the pre-trained model's
-                training set.
-            overwrite_meta_information:
-                If you want to overwrite the meta_information, for example using quantile bounds for some measurements, then there is no need
-                to pre-process it again. In this case, pass in the path to an existing meta_information pickled file. 
+        Other Parameters
+        ----------------
+        drop_empty_dynamic : bool, default=True
+            Whether to remove patients with no recorded dynamic events.
 
-        **KWARGS:
-            drop_empty_dynamic: bool = True,
+        drop_missing_data : bool, default=True
+            Whether to remove records with missing data.
 
-            drop_missing_data: bool = True,
-            
-            exclude_pre_index_age: bool = False,
-
-        TODO: pickle this class rather than separately saving the different attributes. However the SQLite collector cannot be pickled
-            
+        Notes
+        -----
+        - The SQLite collector **cannot be pickled**, so the class attributes are saved separately.
+        - Future work should aim to pickle this class instead of storing separate attributes.
         """
        
         self.save_path = path
