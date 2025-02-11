@@ -14,8 +14,8 @@ from typing import Optional
 from collections import defaultdict
 import os
 from FastEHR.dataloader.dataset.dataset_polars import PolarsDataset
-from FastEHR.dataloader.tokenizers.base import TokenizerBase
-from FastEHR.dataloader.tokenizers.tokenizers import NonTabular, Tabular
+from FastEHR.dataloader.tokenizers_local.base import TokenizerBase
+from FastEHR.dataloader.tokenizers_local.tokenizers_local import NonTabular, Tabular
 import random
 import logging
 from pathlib import Path
@@ -48,6 +48,14 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
     @property
     def is_supervised(self):
         return self.collate_fn.supervised
+
+    @property
+    def context_time_scale(selfs):
+        return self.train_set.time_scale
+
+    @property
+    def supervised_time_scale(self):
+        return self.train_set.time_scale * self.collate_fn.supervised_time_scale
     
     def __init__(self, 
                  path_to_db:                 str,
@@ -59,64 +67,74 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
                  overwrite_practice_ids:     Optional[str] = None,
                  overwrite_meta_information: Optional[str] = None,
                  supervised:                 bool = False,
+                 supervised_time_scale:      float = 1.0,
                  subsample_training:         Optional[int] = None,
                  **kwargs   
                 ):
         """
-        
-        ARGS:
-            path_to_db:
-                Complete path to the SQL database folder
+        Initializes the `FoundationalDataModule`, a PyTorch Lightning DataModule for foundational models.
 
-            path_to_ds:
-                Complete path to the pre-processed dataset folder, either to load from or save to
-            
-            load:  
-                True: load directly from previously processed parquet files; or False: create the parquet files again and save to `path`.  
-        KWARGS:
-            tokenizer:
+        This module handles data loading, preprocessing, and batching for training, validation, and testing.
+        It supports both supervised and unsupervised learning tasks and integrates tokenization, meta-information
+        loading, and dataset preparation.
 
-            batch_size:
+        Parameters
+        ----------
+        path_to_db : str
+            Full path to the SQLite database folder.
 
-            min_workers:
+        path_to_ds : str
+            Full path to the preprocessed dataset folder, either for loading or saving data.
 
-            overwrite_practice_ids:
-                If you want to overwrite the practice ID allocations to train/test/validation splits, for example if you are building a fine-tuning dataset
-                from within the foundation model dataset you will need to ensure information is not leaked into the test/validation from the pre-trained model's
-                training set.
-            overwrite_meta_information:
-                If you want to overwrite the meta_information, for example using quantile bounds for some measurements, then there is no need
-                to pre-process it again. In this case, pass in the path to an existing meta_information pickled file. 
+        load : bool
+            If `True`, loads preprocessed dataset from Parquet files.
+            If `False`, processes raw SQLite data and saves it as Parquet files.
 
-        **KWARGS 
-            freq_threshold:
-                Value between 0 and 1, controlling at what level of frequency rare tokens are mapped to the UNK token. Used to reduce vocabulary size
-            practice_inclusion_conditions:
-                The set of inclusion conditions to query against the collector. For example, only include patients from practices where ["COUNTRY = 'E'"]
-            include_static:
-                Whether to include static information in the meta_information
-            include_diagnoses:
-                Whether to include diagnoses in the meta_information, and in the parquet dataset
-            include_measurements
-                Whether to include measurements in the meta_information, and in the parquet dataset
-            drop_empty_dynamic: bool = True,
+        tokenizer : str, optional, default="tabular"
+            Specifies which tokenizer to use.
+            - `"tabular"`: Uses `Tabular` tokenizer.
+            - Any other string defaults to `NonTabular`.
 
-            drop_missing_data: bool = True,
-            
-            exclude_pre_index_age: bool = False,
+        batch_size : int, optional, default=64
+            Number of samples per batch for DataLoader.
 
-            max_seq_length:
+        min_workers : int, optional, default=1
+            Minimum number of workers used for data loading.
 
-            standardise_values:
+        overwrite_practice_ids : str, optional
+            Path to a file containing new practice ID allocations for train/test/validation splits.
+            This prevents data leakage when creating fine-tuning datasets.
 
-            global_diagnoses:
+        overwrite_meta_information : str, optional
+            Path to an existing meta-information pickle file.
+            If provided, it prevents redundant preprocessing of meta-information.
 
+        supervised : bool, optional, default=False
+            If `True`, enables supervised training mode.
+
+        supervised_time_scale: float, optional, default 3650.0
+            The scaling factor applied to any supervised target times produced in the Collator (default: 10 years). This
+            is multiplicative with the time_scale in FoundationalDataset.
+
+        subsample_training : int, optional
+            If specified, reduces the training dataset to a random subset of this size.
+
+        **kwargs
+            Additional keyword arguments passed to PolarsDataset.fit()
+
+        Notes
+        -----
+        - Loads tokenizer vocabulary from meta-information and initializes dataset splits.
+        - Supports dataset reprocessing or direct loading from Parquet files.
+        - Uses `Collator` for batch collation, which supports both causal and non-causal tasks.
+        - Handles training, validation, and test dataset creation with tokenization.
         """
+
         super().__init__()
 
         self.batch_size = batch_size
         self.min_workers = min_workers
-        self.collate_fn = Collator(supervised=supervised)
+        self.collate_fn = Collator(supervised=supervised, supervised_time_scale=supervised_time_scale)
         
         # Get the DL friendly representation, either by loading or building from scratch.
         if load is False:
@@ -177,6 +195,7 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
         return self.train_set.tokenizer.decode(sequence)
 
     def train_dataloader(self):
+        """"""
         return DataLoader(            
             dataset=self.train_set,
             batch_size=self.batch_size,
@@ -187,6 +206,7 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
         )
 
     def val_dataloader(self):
+        """"""
         return DataLoader(
             dataset=self.val_set,
             batch_size=self.batch_size,
@@ -197,6 +217,7 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
         )
 
     def test_dataloader(self):
+        """"""
         return DataLoader(
             dataset=self.test_set,
             batch_size=self.batch_size,
@@ -208,7 +229,7 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
 
     
 class FoundationalDataset(Dataset):
-    r"""
+    """
     """
 
     def view_sample(self, idx, max_dynamic_events=None, report_time=False):
@@ -241,40 +262,65 @@ class FoundationalDataset(Dataset):
                  global_diagnoses:             bool = False,
                  repeating_events:             bool = True,
                  random_context_window:        bool = False,
-                 time_scale:                   float=1825.0,                     # Scale by 5 years so when we model on a standardised time grid we look 5 years ahead
+                 time_scale:                   float=1825.0,                     # Scale by 5 years so when we model on unit interval, we look 5 years ahead
                  subsample:                    Optional[int] = None,
                  **kwargs
                 ):
         """
+        Initialize the `FoundationalDataset`, a dataset class for foundational model training.
 
-        ARGS:
-            parquet_path:
+        This dataset is constructed from preprocessed Parquet files and provides tokenized and structured
+        sequences of events, including dynamic and static features.
 
-            split:
+        Parameters
+        ----------
+        parquet_path : str
+            Path to the directory containing Parquet dataset files.
 
-            tokenizer:
+        split : str
+            Dataset split type (`"train"`, `"val"`, or `"test"`).
 
-            meta_information:
+        tokenizer : TokenizerBase
+            Tokenizer used for encoding event sequences.
 
-            file_row_count_dict:
+        meta_information : dict
+            Dictionary containing meta-information about the dataset, including measurement statistics.
 
-        KWARGS:
-            max_seq_length:
+        file_row_count_dict : dict
+            Dictionary mapping Parquet filenames to the number of rows they contain.
 
-            standardise_values
+        max_seq_length : int, optional, default=256
+            The maximum number of tokens in a sequence. Longer sequences are truncated.
 
-            global_diagnoses:
-                Whether to enforce all diagnoses are included in the context window
+        standardise_values : bool, optional, default=True
+            Whether to standardize event values based on dataset statistics.
 
-            repeating_events:
-                Whether we allow repeated events. For example, if two Body Mass Index records exist then True retains both, whilst False keeps only the latest record.
-            
-            random_context_window:
-                Whether to randomly sample context window (True) or use latest events (False)
+        global_diagnoses : bool, optional, default=False
+            If True, ensures all historical diagnoses are included in each sequence's context window.
 
-        **KWARGS:
-            None
-        """        
+        repeating_events : bool, optional, default=True
+            Whether to allow repeated events within a sequence.
+            - `True`: Retains all occurrences of an event.
+            - `False`: Keeps only the latest record of each event.
+            These may still fall outside of a context window.
+
+        random_context_window : bool, optional, default=False
+            Whether to randomly sample context windows or use the latest events.
+
+        time_scale : float, optional, default=1825.0
+            The scaling factor applied to age values (default: 5 years).
+
+        subsample : int, optional
+            If specified, limits the dataset to a random subsample of this size.
+
+        Notes
+        -----
+        - The dataset loads preprocessed patient event sequences and encodes them using the tokenizer.
+        - Supports both fixed-length and randomly sampled context windows.
+        - Static covariates are one-hot encoded and stored separately from dynamic sequences.
+        - The dataset length is computed based on the sum of row counts across Parquet files.
+        """
+
         super().__init__()
         
         self.parquet_path = parquet_path
@@ -553,13 +599,24 @@ class FoundationalDataset(Dataset):
 
 class Collator(object):
     
-    def __init__(self, supervised=False):
+    def __init__(self, supervised=False, supervised_time_scale=2.0):
         """
-        supervised:                           whether to take the last time point as the target
+        supervised:
+            Whether to take the last time point as the target
+
+        supervised_time_scale: float, optional, default 2.0
+            The scaling factor applied to any supervised target times produced in the Collator (default: 2\times 5 years).
+
+        Note: The collator receives the times from `FoundationalDataset()` which are already scaled. The way this is
+        coded leads to a multiplicative effect (TODO: put all scaling in the Collator to simplify code and API)
         """
         
         logging.info(f"Creating {'supervised' if supervised else 'unsupervised'} collator for DataModule")
+        if supervised:
+            logging.info(f"Scaling supervised target ages by a factor of {supervised_time_scale} times the context scale.")
+
         self.supervised = supervised
+        self.supervised_time_scale = supervised_time_scale
         
     def __call__(self, data:list[dict]):
         return self.collate_fn(data)
@@ -588,32 +645,73 @@ class Collator(object):
                 }
     
             if self.supervised:
-                worker_batch = self.convert_to_supervised(worker_batch)
+                worker_batch = self.convert_to_supervised(worker_batch, self.supervised_time_scale)
             
             return worker_batch
 
     @staticmethod
-    def convert_to_supervised(batch):
+    def convert_to_supervised(batch, supervised_time_scale):
         """
-        Utilty method which can be combined with FoundationalDataModule produced batches for none-causal tasks
-        
-        Replace the last non-padding token in each row with a padding token (0)
-        and create new vectors containing the removed tokens and their corresponding values.
-        
-        Parameters:
-        batch (dict): Containing the keys
-            token_matrix (torch.Tensor): The input tensor with padded sequences.
-            age_matrix (torch.Tensor): The tensor containing ages corresponding to each token in the matrix.
-            value_matrix (torch.Tensor): The tensor containing values corresponding to each token in the matrix.
-            masking_matrix (torch.Tensor): The tensor containing masks corresponding to each token in the matrix.
-        
-        Returns:
-        torch.Tensor: The modified matrix with the last non-padding token replaced with padding.
-        torch.Tensor: The modified value matrix with the last non-padding value replaced with np.nan.
-        torch.Tensor: The vector containing the removed tokens.
-        torch.Tensor: The vector containing the values that were removed from the value_matrix.
+        Convert a batch to a supervised format for non-causal tasks.
+
+        This method is used in conjunction with `FoundationalDataModule` for non-causal tasks, where the
+        last non-padding token in each sequence is removed and used as a supervised target.
+
+        Specifically, this function:
+        - Replaces the last non-padding token in each row with a padding token (0).
+        - Creates new target vectors containing the removed tokens, values, and age deltas.
+        - Ensures alignment of token sequences, masking, and corresponding values.
+
+        Parameters
+        ----------
+        batch : dict
+            A dictionary containing the following keys:
+
+            - **tokens** (*torch.Tensor*):
+              The input tensor containing tokenized sequences with padding.
+
+            - **ages** (*torch.Tensor*):
+              The tensor containing ages corresponding to each token in the matrix.
+
+            - **values** (*torch.Tensor*):
+              The tensor containing values corresponding to each token in the matrix.
+
+            - **attention_mask** (*torch.Tensor*):
+              The tensor containing masks indicating valid tokens.
+
+        Returns
+        -------
+        dict
+            A modified batch dictionary containing the following keys:
+
+            - **tokens** (*torch.Tensor*):
+              The input sequence with the last non-padding token replaced by a padding token (0).
+
+            - **ages** (*torch.Tensor*):
+              The modified age matrix with the last non-padding age replaced by 0.
+
+            - **values** (*torch.Tensor*):
+              The modified value matrix with the last non-padding value replaced with `np.nan`.
+
+            - **attention_mask** (*torch.Tensor*):
+              The modified mask matrix with the last non-padding entry set to 0.
+
+            - **target_token** (*torch.Tensor*):
+              A vector containing the removed tokens.
+
+            - **target_age_delta** (*torch.Tensor*):
+              A vector containing the difference in age between the last two non-padding tokens.
+
+            - **target_value** (*torch.Tensor*):
+              A vector containing the values that were removed from `values`.
+
+        Notes
+        -----
+        - If a sample does not contain at least two non-padding events, a warning is logged, and the sample is removed.
+        - This function prevents information leakage by ensuring that the last event in a sequence is not used as an input.
+        - If `convert_to_supervised()` is applied multiple times to the same batch, it will be skipped to prevent redundant modifications.
+
         """
-        
         # batch = copy.deepcopy(batch)
     
         # Check if conversion has already happened
@@ -683,7 +781,7 @@ class Collator(object):
 
         # targets
         batch["target_token"] = removed_tokens #
-        batch["target_age_delta"] = removed_ages #.reshape((-1,1))
+        batch["target_age_delta"] = removed_ages / supervised_time_scale  #.reshape((-1,1))
         batch["target_value"] = removed_values #.reshape((-1,1))
 
         return batch

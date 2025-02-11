@@ -4,7 +4,7 @@ import sys
 import torch
 from hydra import compose, initialize
 from omegaconf import OmegaConf
-from CPRD.data.foundational_loader import FoundationalDataModule
+from FastEHR.dataloader.foundational_loader import FoundationalDataModule
 import logging
 import time
 
@@ -18,18 +18,13 @@ if __name__ == "__main__":
     print(f"Using device: {device}.")
     print(f"Fitting dataset over {num_threads} threads")
 
-    # load the configuration file, override any settings 
-    with initialize(version_base=None, config_path="../modelling/SurvStreamGPT/confs", job_name="dataset_creation_notebook"):
-        cfg = compose(config_name="config_CompetingRisk37M")
-    print(OmegaConf.to_yaml(cfg))
-
-    # Build 
+    # Build
     # overwrite_meta_information:
     #   There is no need to over-write this yet.
     #   In creating the dataset, we collect values which can be used by default, we can then change these, and pass them into it again to load the dataset.
-    dm = FoundationalDataModule(path_to_db=cfg.data.path_to_db,
-                                path_to_ds=cfg.data.path_to_ds,
-                                load=False,
+    dm = FoundationalDataModule(path_to_db="../data/_built/example_database.db",
+                                path_to_ds="../data/_built/dataset/",
+                                load=True,
                                 include_diagnoses=True,                            
                                 include_measurements=True,
                                 drop_missing_data=False,
@@ -46,5 +41,11 @@ if __name__ == "__main__":
     print(f"{len(dm.val_set)} validation patients")
     print(f"{len(dm.test_set)} test patients")
     print(f"{vocab_size} vocab elements")
+
+    print(dm.train_set.view_sample(1))
+
+    for batch in dm.train_dataloader():
+        break
+    print(batch)
     
     

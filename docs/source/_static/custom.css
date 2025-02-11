@@ -1,0 +1,14 @@
+/* Increase the max width of the main content area */
+.wy-nav-content {
+    max-width: 70% !important;  /* Adjust this percentage as needed */
+}
+
+/* Adjust sidebar width if needed */
+.wy-side-nav-search {
+    width: 520px !important;
+}
+
+.wy-nav-side {
+    width: 520px !important;
+}
+

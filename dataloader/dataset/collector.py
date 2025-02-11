@@ -11,18 +11,70 @@ from tqdm import tqdm
 from tdigest import TDigest
 
 class SQLiteDataCollector(Static, Diagnoses, Measurements):
-    """ A class which interfaces with the SQLite database to collect and collate patient records
-
-        Functionality additionally includes collecting meta information from the SQLite database 
     """
-    def __init__(self, db_path):
-        self.db_path = db_path
+    A class to interface with an SQLite database to collect and collate patient records.
 
+    This class provides functionality for extracting structured patient data, aggregating
+     medical events, and computing metadata for pre-processing from an SQLite database.
+
+    Inherits from:
+        - `Static`: Handles static patient data, such as birth year and ethnicity.
+        - `Diagnoses`: Handles diagnosis-related records.
+        - `Measurements`: Handles event-based measurements, which may optionally include an associated value.
+
+    Attributes
+    ----------
+    db_path : str
+        Path to the SQLite database file.
+    connection : sqlite3.Connection.
+        SQLite connection object, initialized when `connect()` is called.
+    cursor : sqlite3.Cursor.
+        Cursor for executing SQL queries.
+
+    Methods
+    -------
+    connect()
+        Establish the SQLite database connection.
+    disconnect()
+        Close the SQLite database connection.
+    _extract_distinct(table_names, identifier_column, inclusion_conditions=None, combine_approach="AND")
+        Extracts distinct values of a given column across multiple tables.
+    _extract_AGG(table_name, identifier_column=None, aggregations="COUNT(*)", condition=None)
+        Performs grouped aggregations over tables.
+    _t_digest_values(table_name)
+        Uses the `t-digest algorithm <https://github.com/tdunning/t-digest>` to approximate percentiles of a given measurement.
+    _generate_lazy_by_distinct(distinct_values, identifier_column, include_diagnoses=True, include_measurements=True, conditions=None)
+        Generates Polars LazyFrames for distinct patient or practice identifiers.
+    _collate_lazy_tables(lazy_frames, study_inclusion_method=None, drop_empty_dynamic=True, drop_missing_data=True, **kwargs)
+        Merges static and dynamic patient records into a single LazyFrame.
+    get_meta_information(practice_ids=None, static=True, diagnoses=True, measurement=True)
+        Collects metadata from the SQLite database, including distributions of diagnoses and measurements.
+    """
+
+    def __init__(self, db_path: str):
+        """
+        Initializes the SQLiteDataCollector.
+
+        Parameters
+        ----------
+        db_path : str
+            Path to the SQLite database file.
+        """
+        self.db_path = db_path
         self.connection = None
         self.cursor = None
 
     def connect(self):
-        """Establish the SQLite database connection."""
+        """
+        Establishes a connection to the SQLite database.
+
+        If the connection is already established, this method does nothing.
+
+        Raises
+        ------
+        sqlite3.Error
+            If an error occurs while connecting to the database.
+        """
         if self.connection is None:
             try:
                 self.connection = sqlite3.connect(self.db_path, timeout=20000)
@@ -34,7 +86,11 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
             logging.debug("Connection already established.")
 
     def disconnect(self):
-        """Close the SQLite database connection."""
+        """
+        Closes the SQLite database connection.
+
+        This method ensures that both the connection and cursor are properly closed.
+        """
         if self.connection:
             self.connection.close()
             self.connection = None
@@ -48,7 +104,28 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
                           combine_approach:     str = "AND"
                           ) -> list[str]:
         """
-        Get a list of distinct `identifier_column' values, contained in a collection of tables
+        Extracts distinct values of an identifier column across multiple tables.
+
+        Parameters
+        ----------
+        table_names : list[str]
+            List of table names to extract values from.
+        identifier_column : str
+            Column name to extract distinct values from.
+        inclusion_conditions : list[str], optional
+            List of SQL conditions to filter each table's records (default is None).
+        combine_approach : str, optional
+            How to combine results across tables ("AND" for intersection, "OR" for union). Default is "AND".
+
+        Returns
+        -------
+        list[str]
+            List of unique identifier values found across the specified tables.
+
+        Raises
+        ------
+        NotImplementedError
+            If an invalid `combine_approach` is provided.
         """
         # Initialize an empty set to store distinct values
         unique_distinct = set()
@@ -91,9 +168,27 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
                      condition:           Optional[str] = None,
                      ):
         """
-        Perform (optionally grouped) aggregations over tables. 
-        
-        For example, how many of each diagnosis, total observed values for a certain measurement, etc.
+        Performs aggregated calculations over a specified table.
+
+        Example usages: (1) count number of each diagnosis, (2) total number of observed values for
+         a measurement, etc.
+
+        Parameters
+        ----------
+        table_name : str
+            The name of the table to perform aggregation on.
+        identifier_column : str, optional
+            Column name for grouping the aggregation (default is None).
+        aggregations : str, optional
+            Aggregation function(s) to apply, such as `COUNT(*)` or `AVG(VALUE)` (default is "COUNT(*)").
+        condition : str, optional
+            SQL condition to filter rows before aggregation (default is None).
+
+        Returns
+        -------
+        list
+            The result of the aggregation query.
+
         """
         query = f"SELECT "
         
@@ -122,9 +217,23 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
                          table_name:          str,
                          ):
         """
-        Approximate percentiles using Ted Dunning's t-digest algorithm (see https://github.com/tdunning/t-digest)
-        
-           This is a data structure for online accumulation of rank-based statistics, such as quantiles and trimmed means.
+        Approximates percentiles using `Ted Dunning's t-digest algorithm <https://github.com/tdunning/t-digest>`.
+
+        This method efficiently accumulates rank-based statistics from large datasets.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the table containing numeric values.
+
+        Returns
+        -------
+        TDigest
+            A t-digest object containing approximated percentiles.
+
+        Notes
+        -----
+        The algorithm supports streaming updates for large datasets.
         """
 
         digest = TDigest()
@@ -155,20 +264,29 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
                                    conditions: Optional[list[str]] = None
                                    ) -> list[pl.LazyFrame]:
         """
-        ARGS:
-            distinct_values:
-                    is a list of distinct values on which to partition the identifier_column
-            identifier_column: 
-                    the identifier column to use for partioning (either PRACTICE_ID or PATIENT_ID. Default: PRACTICE_ID).
+        Generates Polars LazyFrames for each unique identifier.
 
-        KWARGS:
-            include_diagnoses:      
-                    Whether to include diagnoses table values in the list of returned lazy frames
-            include_measurements:
-                    Whether to include measurement table values in the list of returned lazy frames
-            conditions:  
-                    is a list of conditions to filter the data (removing rows from sql tables), where each condition applies to a specific table. 
-                    Note, this is probably not required, as this does not remove entire patients, nor practices, based on criteria - but singular events.
+        Parameters
+        ----------
+        distinct_values : list
+            List of distinct values on which to partition the identifier_column.
+        identifier_column : str
+            The column used for partitioning data (e.g., `PATIENT_ID` or `PRACTICE_ID`).
+        include_diagnoses : bool, optional
+            Whether to include diagnosis records (default is True).
+        include_measurements : bool, optional
+            Whether to include measurement records (default is True).
+        conditions : list[str], optional
+            List of SQL conditions for each table (default is None). Each condition applies to a specific table.
+
+        Yields
+        ------
+        tuple
+            A tuple `(distinct_value, rows_by_table)`, where `rows_by_table` contains lazy-loaded data.
+
+        Notes
+        -----
+        `conditions` is likely not required, as this remove neither full patients or practices - but singular events.
         """
         
         table_names = ["static_table"]
@@ -224,41 +342,62 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
                              **kwargs
                              ) -> pl.LazyFrame:
         """
-        Merge each lazy frame from each, applying optional conditions.
-        
-        ┌───────────┬──────────┬────────────┬────────────┬───┬───────────┬──────────┬──────────┬───────────┐
-        │ PRACTICE_ ┆ PATIENT_ ┆ VALUE      ┆ EVENT      ┆ … ┆ HEALTH_AU ┆ INDEX_DA ┆ START_DA ┆ END_DATE  │
-        │ ID        ┆ ID       ┆ ---        ┆ ---        ┆   ┆ TH        ┆ TE       ┆ TE       ┆ ---       │
-        │ ---       ┆ ---      ┆ list[f64]  ┆ list[str]  ┆   ┆ ---       ┆ ---      ┆ ---      ┆ datetime[ │
-        │ i64       ┆ i64      ┆            ┆            ┆   ┆ str       ┆ datetime ┆ datetime ┆ μs]       │
-        │           ┆          ┆            ┆            ┆   ┆           ┆ [μs]     ┆ [μs]     ┆           │
-        ╞═══════════╪══════════╪════════════╪════════════╪═══╪═══════════╪══════════╪══════════╪═══════════╡
-        │ 20429     ┆ 22038164 ┆ [60.0,     ┆ ["Diastoli ┆ … ┆ South     ┆ 2005-01- ┆ 2005-01- ┆ 2022-03-1 │
-        │           ┆ 20429    ┆ 120.0, …   ┆ c_blood_pr ┆   ┆ East      ┆ 01       ┆ 01       ┆ 7         │
-        │           ┆          ┆ 100.0]     ┆ essure_5", ┆   ┆           ┆ 00:00:00 ┆ 00:00:00 ┆ 00:00:00  │
-        │           ┆          ┆            ┆ "…         ┆   ┆           ┆          ┆          ┆           │
-        │ 20429     ┆ 22038165 ┆ [20.7,     ┆ ["Body_mas ┆ … ┆ South     ┆ 2018-06- ┆ 2018-06- ┆ 2022-03-1 │
-        │           ┆ 20429    ┆ null, …    ┆ s_index_3" ┆   ┆ East      ┆ 27       ┆ 27       ┆ 7         │
-        │           ┆          ┆ 144.0]     ┆ , "Body_ma ┆   ┆           ┆ 00:00:00 ┆ 00:00:00 ┆ 00:00:00  │
-        │           ┆          ┆            ┆ ss…        ┆   ┆           ┆          ┆          ┆           │
-        │ 20429     ┆ 22038168 ┆ [null,     ┆ ["Never_sm ┆ … ┆ South     ┆ 2011-04- ┆ 2011-04- ┆ 2022-03-1 │
-        │           ┆ 20429    ┆ 90.0,      ┆ oked_tobac ┆   ┆ East      ┆ 23       ┆ 23       ┆ 7         │
-        │           ┆          ┆ 130.0]     ┆ co_85",    ┆   ┆           ┆ 00:00:00 ┆ 00:00:00 ┆ 00:00:00  │
-        │           ┆          ┆            ┆ "Dia…      ┆   ┆           ┆          ┆          ┆           │
-        │ 20429     ┆ 22038169 ┆ [25.9,     ┆ ["Body_mas ┆ … ┆ South     ┆ 2005-01- ┆ 2005-01- ┆ 2011-11-0 │
-        │           ┆ 20429    ┆ 80.0, …    ┆ s_index_3" ┆   ┆ East      ┆ 01       ┆ 01       ┆ 7         │
-        │           ┆          ┆ 120.0]     ┆ , "Diastol ┆   ┆           ┆ 00:00:00 ┆ 00:00:00 ┆ 00:00:00  │
-        │           ┆          ┆            ┆ ic…        ┆   ┆           ┆          ┆          ┆           │
-        │ 20429     ┆ 22038170 ┆ [24.8,     ┆ ["Body_mas ┆ … ┆ South     ┆ 2005-01- ┆ 2005-01- ┆ 2008-06-1 │
-        │           ┆ 20429    ┆ 76.0, …    ┆ s_index_3" ┆   ┆ East      ┆ 01       ┆ 01       ┆ 9         │
-        │           ┆          ┆ null]      ┆ , "Diastol ┆   ┆           ┆ 00:00:00 ┆ 00:00:00 ┆ 00:00:00  │
-        │           ┆          ┆            ┆ ic…        ┆   ┆           ┆          ┆          ┆           │
-        └───────────┴──────────┴────────────┴────────────┴───┴───────────┴──────────┴──────────┴───────────┘
+        Merges LazyFrames containing patient records into a single frame.
 
-        Notes:  The collection is applied after this function
-                We do not sort within the lazy operation, so the row order will not be deterministic
+        Parameters
+        ----------
+        lazy_frames : dict
+            Dictionary of Polars LazyFrames containing static and dynamic (diagnosis and measurement table) records.
+        study_inclusion_method : callable, optional
+            Custom function to filter patient records (default is None).
+        drop_empty_dynamic : bool, optional
+            Whether to remove patients without dynamic events (default is True).
+        drop_missing_data : bool, optional
+            Whether to remove records with missing values (default is True).
+
+        Returns
+        -------
+        pl.LazyFrame
+            A combined LazyFrame containing static and dynamic patient data. See example.
+
+        Example merged frame return
+        ---------------------------
+
+        .. table::
+
+            +-------------+------------+----------------------------+------------------------------------------+---+------------+------------+------------+------------+
+            | PRACTICE_ID | PATIENT_ID | VALUE                      | EVENT                                    | … | HEALTH_AU  | INDEX_DATE | START_DATE | END_DATE   |
+            +=============+============+============================+==========================================+===+============+============+============+============+
+            | 20429       | 22038164   | [60.0, 120.0, 100.0]       | ["Diastolic_blood_pressure_5", "..." ]  | … | South East | 2005-01-01 | 2005-01-01 | 2022-03-17 |
+            +-------------+------------+----------------------------+------------------------------------------+---+------------+------------+------------+------------+
+            | 20429       | 22038165   | [20.7, null, 144.0]        | ["Body_mass_index_3", "..."]            | … | South East | 2018-06-27 | 2018-06-27 | 2022-03-17 |
+            +-------------+------------+----------------------------+------------------------------------------+---+------------+------------+------------+------------+
+            | 20429       | 22038168   | [null, 90.0, 130.0]        | ["HYPERTENSION", "..."]                 | … | South East | 2011-04-23 | 2011-04-23 | 2022-03-17 |
+            +-------------+------------+----------------------------+------------------------------------------+---+------------+------------+------------+------------+
+            | 20429       | 22038169   | [25.9, 80.0, 120.0]        | ["Body_mass_index_3", "..."]            | … | South East | 2005-01-01 | 2005-01-01 | 2011-11-07 |
+            +-------------+------------+----------------------------+------------------------------------------+---+------------+------------+------------+------------+
+            | 20429       | 22038170   | [24.8, 76.0, null]         | ["Body_mass_index_3", "..."]            | … | South East | 2005-01-01 | 2005-01-01 | 2008-06-19 |
+            +-------------+------------+----------------------------+------------------------------------------+---+------------+------------+------------+------------+
+
+        Columns:
+            - **PRACTICE_ID** (*int*): Unique identifier for the medical practice.
+            - **PATIENT_ID** (*int*): Unique identifier for the patient.
+            - **VALUE** (*list[float]*): Measurement values recorded.
+            - **EVENT** (*list[str]*): Event descriptions.
+            - **TODO: ADD MISSING**
+            - **HEALTH_AU** (*str*): Health authority region.
+            - **INDEX_DATE** (*datetime*): The index date of patient entry.
+            - **START_DATE** (*datetime*): Start date of record.
+            - **END_DATE** (*datetime*): End date of record.
+
+        Notes:
+            - `VALUE` contains lists of numeric measurements, where `null` represents missing values.
+            - `EVENT` contains lists of medical events related to each patient.
+            - The dataset is sorted by `PRACTICE_ID` and `PATIENT_ID`.
+            - The Polars collection is **not** applied inside this function
+            - We **do not** sort within this lazy operation, so the row order will not be deterministic
         """
-        
+
         ##############################
         # GET THE LAZY POLARS FRAMES #
         ##############################
@@ -378,6 +517,25 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
                              diagnoses:             bool = True,
                              measurement:           bool = True,
                             ) -> dict:
+        """
+        Collects metadata from the SQLite database, such as distributions of diagnoses and measurements.
+
+        Parameters
+        ----------
+        practice_ids : list, optional
+            List of practice IDs to filter metadata collection (default is None).
+        static : bool, optional
+            Whether to collect static patient information (default is True).
+        diagnoses : bool, optional
+            Whether to collect diagnosis-related metadata (default is True).
+        measurement : bool, optional
+            Whether to collect measurement-related metadata (default is True).
+
+        Returns
+        -------
+        dict
+            A dictionary containing metadata tables.
+        """
 
         # Standardisation is TODO
         logging.info("\n\nCollecting meta information from database. This will be used for tokenization and (optionally) standardisation.")
