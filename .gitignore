@@ -56,6 +56,8 @@ cov.xml
 docs/_build/
 
 # Notebook output
+**/
 **/*.nbconvert.ipynb
 **/*.out
 
+.ipynb_checkpoints/
