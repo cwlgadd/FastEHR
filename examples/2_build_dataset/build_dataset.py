@@ -32,7 +32,9 @@ if __name__ == "__main__":
                                 tokenizer="tabular",
                                 practice_inclusion_conditions=["COUNTRY = 'E'"],
                                 overwrite_meta_information=None,         
-                                num_threads=num_threads
+                                num_threads=num_threads,
+                                supervised=True,
+                                supervised_time_scale=1
                                )
     
     vocab_size = dm.train_set.tokenizer.vocab_size
