@@ -24,7 +24,6 @@ import pickle
 import copy
 
 # Testing modules
-from FastEHR.database import queries
 import sqlite3
 
 import time
