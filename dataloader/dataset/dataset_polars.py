@@ -1,21 +1,15 @@
 # Build deep-Learning friendly representations from each stream of input data (static, diagnosis, measurements) from the reformatted SQL database
-from typing import Optional, Any, Union
-from collections.abc import Sequence
-import itertools
+from typing import Optional
 import pathlib
-import sqlite3
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
-import pyarrow.dataset as ds
 import pickle
 import numpy as np
-from FastEHR.dataloader.dataset.collector import SQLiteDataCollector
+from database.collector import SQLiteDataCollector
 from sklearn.model_selection import train_test_split as sk_split
 import logging
 from tqdm import tqdm
-import psutil
-import os
 from joblib import Parallel, delayed
 
 class PolarsDataset:

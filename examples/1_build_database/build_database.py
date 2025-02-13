@@ -1,16 +1,9 @@
 import os
-from pathlib import Path
-import sys
-import pytorch_lightning
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
-import random
-import sqlite3
 import logging
-from FastEHR.database.build_static_table import Static
-from FastEHR.database.build_diagnosis_table import Diagnoses
-from FastEHR.database.build_valued_event_tables import Measurements
+from database.build.build_static_table import Static
+from database.build.build_diagnosis_table import Diagnoses
+from database.build.build_valued_event_tables import Measurements
 
 if __name__ == "__main__":
 
