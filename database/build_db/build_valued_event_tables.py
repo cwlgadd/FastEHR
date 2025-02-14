@@ -4,6 +4,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 import glob
+from pathlib import Path
 import zipfile
 import multiprocessing
 import logging
@@ -15,7 +16,7 @@ class Measurements():
     @staticmethod
     def extract_measurement_name(fname):
         # Measurement/test name is contained in the file names following version dependent prefixes. Remove them.
-        mname = fname.split("/")[-1]
+        mname = Path(fname).name
 
         # we can remove the file extension (either .csv or .zip)
         mname = mname[:-4]
@@ -57,7 +58,7 @@ class Measurements():
     def __str__(self):
         self.connect()
         s = "Measurement table:"
-        s += "\nMeasurement & Count (thousands)"
+        s += "\nMeasurement & Count"
         total_count = 0
         for table in self.measurement_table_names:
             self.cursor.execute(f"SELECT COUNT(*) FROM {table}")
@@ -96,8 +97,8 @@ class Measurements():
         # Each file is a table which partitions measurements
         path = self.path_to_data + "*.csv" if unzip is False else self.path_to_data + "*.zip"
         for filename in sorted(glob.glob(path)):
-        
             measurement_name = self.extract_measurement_name(filename)
+            logging.info(f"Building table from file {filename} to table: measurement_{measurement_name}")
 
             self._create_measurement_partition(measurement_name)
             self._file_to_measurement_table(filename, measurement_name, verbose=verbose, **kwargs)
@@ -117,7 +118,7 @@ class Measurements():
                                         DATE text )""")
 
         # Create index
-        logging.debug(f"Creating PRACTICE_PATIENT_ID index on measurement_{measurement_name}")
+        logging.debug(f"Creating PRACTICE_ID index on measurement_{measurement_name}")
         for index in ["PRACTICE_ID"]:
             query = f"CREATE INDEX IF NOT EXISTS '{measurement_name}_{index}_idx' ON measurement_{measurement_name} ({index});"
             logging.debug(query)
