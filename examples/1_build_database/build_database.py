@@ -1,9 +1,9 @@
 import os
 import torch
 import logging
-from database.build.build_static_table import Static
-from database.build.build_diagnosis_table import Diagnoses
-from database.build.build_valued_event_tables import Measurements
+from database.build_db.build_static_table import Static
+from database.build_db.build_diagnosis_table import Diagnoses
+from database.build_db.build_valued_event_tables import Measurements
 
 if __name__ == "__main__":
 
