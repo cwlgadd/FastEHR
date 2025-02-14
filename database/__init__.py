@@ -1,2 +1,2 @@
-from . import build
+from . import build_db
 from . import collector
