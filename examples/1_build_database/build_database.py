@@ -4,6 +4,7 @@ import logging
 from database.build_db.build_static_table import Static
 from database.build_db.build_diagnosis_table import Diagnoses
 from database.build_db.build_valued_event_tables import Measurements
+from FastEHR.database.collector import SQLiteDataCollector
 
 if __name__ == "__main__":
 
@@ -31,5 +32,15 @@ if __name__ == "__main__":
 
     for table in [static, diagnosis, measurements]:
         print(table)
-    
-    
+
+    # Check tables built properly
+    collector = SQLiteDataCollector(db_path=PATH_TO_DB)
+    collector.connect()
+
+    collector.cursor.execute("""SELECT name FROM sqlite_master WHERE type='table';""")
+    print(collector.cursor.fetchall())
+
+    collector.cursor.execute( """SELECT * FROM measurement_25_Hydroxyvitamin_D2_level_92_""")
+    results = collector.cursor.fetchall()
+    for result in results:
+        print(result)
