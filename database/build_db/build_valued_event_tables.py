@@ -52,7 +52,7 @@ class Measurements():
         self.path_to_data = path_to_data
 
         if load is False:
-            self.build_table()
+            self.build_table(unzip=False)
 
     def __str__(self):
         self.connect()
