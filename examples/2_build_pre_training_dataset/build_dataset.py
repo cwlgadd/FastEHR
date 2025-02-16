@@ -8,7 +8,6 @@ from FastEHR.dataloader import FoundationalDataModule
 import logging
 import time
 
-
 if __name__ == "__main__":
 
     torch.manual_seed(1337)
@@ -24,30 +23,26 @@ if __name__ == "__main__":
     #   In creating the dataset, we collect values which can be used by default, we can then change these, and pass them into it again to load the dataset.
     dm = FoundationalDataModule(path_to_db="../data/_built/example_database.db",
                                 path_to_ds="../data/_built/dataset/",
-                                load=False,
-                                include_diagnoses=True,                            
+                                load=True,
+                                include_diagnoses=True,
                                 include_measurements=True,
                                 drop_missing_data=False,
                                 drop_empty_dynamic=True,
                                 tokenizer="tabular",
                                 practice_inclusion_conditions=["COUNTRY = 'E'"],
-                                overwrite_meta_information=None,         
-                                num_threads=num_threads,
-                                supervised=True,
-                                supervised_time_scale=1
-                               )
-    
+                                overwrite_meta_information=None,
+                                num_threads=num_threads
+                                )
+
     vocab_size = dm.train_set.tokenizer.vocab_size
-    
+
     print(f"{len(dm.train_set)} training patients")
     print(f"{len(dm.val_set)} validation patients")
     print(f"{len(dm.test_set)} test patients")
     print(f"{vocab_size} vocab elements")
 
-    print(dm.train_set.view_sample(1))
-
     for batch in dm.train_dataloader():
         break
     print(batch)
-    
-    
+
+    dm.train_set.view_sample(1)
