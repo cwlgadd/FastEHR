@@ -232,23 +232,36 @@ class FoundationalDataset(Dataset):
     """
 
     def view_sample(self, idx, max_dynamic_events=None, report_time=False):
-        """ Wrapper around __getitem__ to print a sample in a read-friendly format """
-        # Get row
+        """Displays a sample in a readable format."""
+
         start_time = time.time()
         batch = self.__getitem__(idx)
+
         if report_time:
-            print(f"Time to retrieve sample index {idx} was {time.time() - start_time} seconds\n")
-        # static
+            elapsed_time = time.time() - start_time
+            print(f"Time to retrieve sample index {idx}: {elapsed_time:.4f} seconds\n")
+
+        # Static covariates
         static = self._decode_covariates(batch["static_covariates"])
-        for _key in static:
-            print(f"{_key}".ljust(20) + f"| {static[_key][0]}")
-        # dynamic
+        for key, value in static.items():
+            print(f"{key.ljust(20)}| {value[0]}")
+
+        # Dynamic events
         print(f"Sequence of {len(batch['ages'])} events")
-        print("\nToken".ljust(76) + "| Age at event (in days)".ljust(30) + "| Standardised value".ljust(20) + "\n" + "="*125)
-        for idx_event, (token, age, value) in enumerate(zip(self.tokenizer.decode(batch["tokens"].tolist()).split(" "), batch["ages"], batch["values"])):
-            print(f"{token}".ljust(75) + f"| {age * self.time_scale}".ljust(30) + f"| {value:.2f}".ljust(20))
+        print("\n" + "Token".ljust(76) + "| Age at event (days)".ljust(30) + "| Standardized value".ljust(20))
+        print("=" * 125)
+
+        tokens = self.tokenizer.decode(batch["tokens"].tolist()).split(" ")
+
+        for idx_event, (token, age, value) in enumerate(zip(tokens, batch["ages"], batch["values"])):
+            print(f"{token.ljust(75)}| {str(int(age) * self.time_scale).ljust(30)}| {value:.2f}".ljust(20))
+
             if max_dynamic_events is not None and idx_event >= max_dynamic_events - 1:
                 break
+
+        print("="*125)
+
+        return
         
     def __init__(self,
                  parquet_path:                 str, 
