@@ -18,9 +18,9 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
      medical events, and computing metadata for pre-processing from an SQLite database.
 
     Inherits from:
-        - `Static`: Handles static patient data, such as birth year and ethnicity.
-        - `Diagnoses`: Handles diagnosis-related records.
-        - `Measurements`: Handles event-based measurements, which may optionally include an associated value.
+        * :class:`Static` - Handles static patient data, such as birth year and ethnicity.
+        * :class:`Diagnoses` - Handles diagnosis-related records.
+        * :class:`Measurements` - Handles event-based measurements, which may optionally include an associated value.
 
     Attributes
     ----------
@@ -39,18 +39,18 @@ class SQLiteDataCollector(Static, Diagnoses, Measurements):
         Close the SQLite database connection.
     _extract_distinct(table_names, identifier_column, inclusion_conditions=None, combine_approach="AND")
         Extracts distinct values of a given column across multiple tables.
-    _extract_AGG(table_name, identifier_column=None, aggregations="COUNT(*)", condition=None)
+    _extract_AGG(table_name, identifier_column=None, aggregations=, condition=None)
         Performs grouped aggregations over tables.
     _t_digest_values(table_name)
-        Uses the `t-digest algorithm <https://github.com/tdunning/t-digest>` to approximate percentiles of a given measurement.
+        Uses the `t-digest algorithm <https://github.com/tdunning/t-digest>`_ to approximate percentiles of a given measurement.
     _generate_lazy_by_distinct(distinct_values, identifier_column, include_diagnoses=True, include_measurements=True, conditions=None)
         Generates Polars LazyFrames for distinct patient or practice identifiers.
-    _collate_lazy_tables(lazy_frames, study_inclusion_method=None, drop_empty_dynamic=True, drop_missing_data=True, **kwargs)
+    _collate_lazy_tables(lazy_frames, study_inclusion_method=None, drop_empty_dynamic=True, drop_missing_data=True)
         Merges static and dynamic patient records into a single LazyFrame.
     get_meta_information(practice_ids=None, static=True, diagnoses=True, measurement=True)
         Collects metadata from the SQLite database, including distributions of diagnoses and measurements.
     """
-
+    #``COUNT(*)``
     def __init__(self, db_path: str):
         """
         Initializes the SQLiteDataCollector.

@@ -10,38 +10,38 @@ def preprocess_measurements(pl_lazy_frame: pl.LazyFrame,
                             method: str = "normalise",
                             remove_outliers: bool = True
                             ):
-    r"""
-    Perform standardisation pre-processing
-
-    ARGS:
-        pl_lazy_frame: 
-            A lazy polars dataframe loaded from the SQL tables in the form:
-
-            ┌──────────────────────┬───────┬──────────────────┬──────────────┬───────────────────────┐
-            │ PRACTICE_PATIENT_ID  ┆ VALUE ┆ EVENT            ┆ AGE_AT_EVENT ┆ EVENT_TYPE            │
-            │ ---                  ┆ ---   ┆ ---              ┆ ---          ┆ ---                   │
-            │ str                  ┆ f64   ┆ str              ┆ i64          ┆ str                   │
-            ╞══════════════════════╪═══════╪══════════════════╪══════════════╪═══════════════════════╡
-            │ xxxxxxx              ┆ 22.3  ┆ bmi              ┆ 10151        ┆ univariate_regression │
-
-            where only columns PRACTICE_PATIENT_ID, VALUE, and EVENT are required
-
-    KWARGS:
-        practice_patient_id (optional list of strings)
-            If provided, standardisation is only performed over these patients
-        method:
-            Approach to use (str, default = "normalise"). ``normalise``: Standard normalisation, transform to zero
-            mean unit variance. ``standardise``: standardisation, scale to range between zero and one.
-        transform (bool, default = True)
-            Whether to perform the standardisation in place. F.e. if standardisation should be pre-processed, or 
-            if we just calculate the statistics.
-    
-    RETURN:
-        Dictionary in the form:
-        {"measurement1_name": (bias term, scale term),
-         "measurement2_name": (...,     , ...       ),
-         }
-    """
+    # r"""
+    # Perform standardisation pre-processing
+    #
+    # ARGS:
+    #     pl_lazy_frame:
+    #         A lazy polars dataframe loaded from the SQL tables in the form:
+    #
+    #         ┌──────────────────────┬───────┬──────────────────┬──────────────┬───────────────────────┐
+    #         │ PRACTICE_PATIENT_ID  ┆ VALUE ┆ EVENT            ┆ AGE_AT_EVENT ┆ EVENT_TYPE            │
+    #         │ ---                  ┆ ---   ┆ ---              ┆ ---          ┆ ---                   │
+    #         │ str                  ┆ f64   ┆ str              ┆ i64          ┆ str                   │
+    #         ╞══════════════════════╪═══════╪══════════════════╪══════════════╪═══════════════════════╡
+    #         │ xxxxxxx              ┆ 22.3  ┆ bmi              ┆ 10151        ┆ univariate_regression │
+    #
+    #         where only columns PRACTICE_PATIENT_ID, VALUE, and EVENT are required
+    #
+    # KWARGS:
+    #     practice_patient_id (optional list of strings)
+    #         If provided, standardisation is only performed over these patients
+    #     method:
+    #         Approach to use (str, default = "normalise"). ``normalise``: Standard normalisation, transform to zero
+    #         mean unit variance. ``standardise``: standardisation, scale to range between zero and one.
+    #     transform (bool, default = True)
+    #         Whether to perform the standardisation in place. F.e. if standardisation should be pre-processed, or
+    #         if we just calculate the statistics.
+    #
+    # RETURN:
+    #     Dictionary in the form:
+    #     {"measurement1_name": (bias term, scale term),
+    #      "measurement2_name": (...,     , ...       ),
+    #      }
+    # """
 
     if practice_patient_ids is not None:
         pl_lazy_frame = pl_lazy_frame.filter(pl.col("PRACTICE_PATIENT_ID").is_in(practice_patient_ids))
