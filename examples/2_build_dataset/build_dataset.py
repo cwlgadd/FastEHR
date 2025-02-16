@@ -4,7 +4,7 @@ import sys
 import torch
 from hydra import compose, initialize
 from omegaconf import OmegaConf
-from FastEHR.dataloader.foundational_loader import FoundationalDataModule
+from FastEHR.dataloader import FoundationalDataModule
 import logging
 import time
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     #   In creating the dataset, we collect values which can be used by default, we can then change these, and pass them into it again to load the dataset.
     dm = FoundationalDataModule(path_to_db="../data/_built/example_database.db",
                                 path_to_ds="../data/_built/dataset/",
-                                load=True,
+                                load=False,
                                 include_diagnoses=True,                            
                                 include_measurements=True,
                                 drop_missing_data=False,
