@@ -9,6 +9,7 @@ Subpackages
 
    FastEHR.dataloader.dataset
    FastEHR.dataloader.tokenizers_local
+   FastEHR.dataloader.utils
 
 Submodules
 ----------
