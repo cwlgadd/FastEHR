@@ -259,7 +259,7 @@ class FoundationalDataset(Dataset):
         tokens = self.tokenizer.decode(batch["tokens"].tolist()).split(" ")
 
         for idx_event, (token, age, value) in enumerate(zip(tokens, batch["ages"], batch["values"])):
-            print(f"{token.ljust(75)}| {str(int(age) * self.time_scale).ljust(30)}| {value:.2f}".ljust(20))
+            print(f"{token.ljust(75)}| {str(int(age * self.time_scale)).ljust(30)}| {value:.2f}".ljust(20))
 
             if max_dynamic_events is not None and idx_event >= max_dynamic_events - 1:
                 break
@@ -436,7 +436,7 @@ class FoundationalDataset(Dataset):
                 
             else:
                 raise FileNotFoundError
-           
+
         except:
             raise ValueError(f"No data found for index {idx} from file {self.parquet_path}{self.sub_dir}{file}, with file rowcount {self.file_row_count_dict[file]}")
 
@@ -541,7 +541,7 @@ class FoundationalDataset(Dataset):
         encoded_tokens = earlier_global_events + encoded_tokens[start_pos:end_pos]            
         sequence_ages = earlier_global_ages + sequence_ages[start_pos:end_pos]
         sequence_values = earlier_global_values + sequence_values[start_pos:end_pos]
-                
+
         return {"static_covariates": torch.tensor(static_covariates, dtype=torch.float),
                 "tokens": torch.tensor(encoded_tokens),
                 "ages": torch.tensor(sequence_ages) / self.time_scale,
