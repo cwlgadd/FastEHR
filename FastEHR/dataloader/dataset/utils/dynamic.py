@@ -1,8 +1,8 @@
-# 
-from typing import Optional, Any, Union
-import polars as pl
-import numpy as np
+#
 import logging
+
+from typing import Optional
+import polars as pl
 
 
 def preprocess_measurements(pl_lazy_frame: pl.LazyFrame,
@@ -48,14 +48,14 @@ def preprocess_measurements(pl_lazy_frame: pl.LazyFrame,
 
     logging.info(f"... ... ...  Using standardisation method: {method.lower()}")
     match method.lower():
-        case "normalise":            
+        case "normalise":
             bias = (
-                pl_lazy_frame            
+                pl_lazy_frame
                 .groupby("EVENT")
-                .agg(pl.col("VALUE").mean())            
+                .agg(pl.col("VALUE").mean())
                 )
             scale = (
-                pl_lazy_frame            
+                pl_lazy_frame
                 .groupby("EVENT")
                 .agg(pl.col("VALUE").std())
                 )
@@ -66,10 +66,10 @@ def preprocess_measurements(pl_lazy_frame: pl.LazyFrame,
 
     bias = bias.collect()
     scale = scale.collect()
-    
+
     # Convert bias and scale statistics to a dictionary which can then be used as a lookup in future operations
     #    Complicated chain of operations for one line, but essentially:
-    #       1)  transpose the frame so each column is a measurement/test and the row is 
+    #       1)  transpose the frame so each column is a measurement/test and the row is
     #           the statistic. Column names are default (column_0, column_1, etc)
     #       2) rename the column names with the measurement names from the first row
     #       3) convert to dictionary which can now be used as a look up later
@@ -89,26 +89,30 @@ def preprocess_measurements(pl_lazy_frame: pl.LazyFrame,
         .rename(scale.transpose().head(1).to_dicts().pop())
         .to_dicts()
         .pop()
-    )    
+    )
     logging.debug(f"measurement/test scaling: {method.lower()}: \n bias:{bias}, \n scale: {scale}")
-        
+
     standardisation_dict = {str(key): (bias, scale[key]) for key, bias in bias.items()}
-    
+
     # Perform standardisation on the lazy frame values
-    ####            
+    ####
     # Add bias to every measurement in the lazy frame
-    remap_bias = lambda code: bias.get(code, 0)
+    def remap_bias(code):
+        return bias.get(code, 0)
+
+    def remap_scale(code):
+        return scale.get(code, 1)
+
     pl_lazy_frame = (
         pl_lazy_frame
         .with_columns(
             pl.col("EVENT")
-            .apply(remap_bias) 
+            .apply(remap_bias)
             .alias("bias")
             )
     )
 
     # Add scale to every measurement in the lazy frame
-    remap_scale = lambda code: scale.get(code, 1)
     pl_lazy_frame = (
         pl_lazy_frame
         .with_columns(
@@ -117,21 +121,21 @@ def preprocess_measurements(pl_lazy_frame: pl.LazyFrame,
             .alias("scale")
             )
     )
-    
+
     pl_lazy_frame = (
         pl_lazy_frame
         .with_columns(
             (pl.col("VALUE") - pl.col("bias")) / pl.col("scale")
             .alias("VALUE")
-            )            
+            )
         .drop("bias")
         .drop("scale")
     )
 
     if remove_outliers:
-        logging.info("... ... ... Removing measurement and test outliers. Using three deviations from mean as cutoff")        
+        logging.info("... ... ... Removing measurement and test outliers. Using three deviations from mean as cutoff")
         pl_lazy_frame = pl_lazy_frame.filter((pl.col("VALUE") < 3) | (pl.col("VALUE") > 3))
     else:
         logging.info("... ... ... Not removing measurement and test outliers (beyond initial pre-processing)")
-        
+
     return pl_lazy_frame, standardisation_dict

@@ -1,16 +1,20 @@
-# Build deep-Learning friendly representations from each stream of input data (static, diagnosis, measurements) from the reformatted SQL database
-from typing import Optional
+# Build deep-Learning friendly representations from each stream of input
+# data (static, diagnosis, measurements) from the reformatted SQL database
+import logging
+import pickle
 import pathlib
+from typing import Optional
+
+import numpy as np
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
-import pickle
-import numpy as np
-from FastEHR.database.collector import SQLiteDataCollector
-from sklearn.model_selection import train_test_split as sk_split
-import logging
-from tqdm import tqdm
 from joblib import Parallel, delayed
+from tqdm import tqdm
+from sklearn.model_selection import train_test_split as sk_split
+
+from FastEHR.database.collector import SQLiteDataCollector
+
 
 class PolarsDataset:
     """
@@ -25,7 +29,6 @@ class PolarsDataset:
         self.collector = SQLiteDataCollector(self.path_to_db)
         self.collector.connect()           # Persistent connection
 
-
     def fit(self,
             path:                                str,
             practice_inclusion_conditions:       Optional[list[str]] = None,
@@ -36,7 +39,7 @@ class PolarsDataset:
             overwrite_meta_information:          Optional[str] = None,
             num_threads:                         int = 1,
             **kwargs
-           ):
+            ):
         """
         Creates a deep-learning-friendly dataset by extracting structured data from an SQLite database.
 
@@ -91,7 +94,7 @@ class PolarsDataset:
         - The SQLite collector **cannot be pickled**, so the class attributes are saved separately.
         - Future work should aim to pickle this class instead of storing separate attributes.
         """
-       
+
         self.save_path = path
         logging.info(f"Building Polars datasets and saving to {path}")
 
@@ -102,7 +105,7 @@ class PolarsDataset:
                     practice_inclusion_conditions=practice_inclusion_conditions
                 )
                 splits = {"train": self.train_practice_ids, "val": self.val_practice_ids, "test": self.test_practice_ids}
-                with open(self.save_path + f'practice_id_splits.pickle', 'wb') as handle:
+                with open(self.save_path + 'practice_id_splits.pickle', 'wb') as handle:
                     pickle.dump(splits, handle, protocol=pickle.HIGHEST_PROTOCOL)
             else:
                 # If fine-tuning then we want to use existing splits to avoid data leakage
@@ -122,7 +125,7 @@ class PolarsDataset:
                     diagnoses=include_diagnoses, measurement=include_measurements
                 )
                 logging.debug(f"meta_information {meta_information}")
-                with open(self.save_path + f'meta_information.pickle', 'wb') as handle:
+                with open(self.save_path + 'meta_information.pickle', 'wb') as handle:
                     pickle.dump(meta_information, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
             # Process splits in parallel, chunking by practice
@@ -141,19 +144,22 @@ class PolarsDataset:
 
                 # Create parquet train/test/val dataset
                 self.__save_data_to_parquet(
-                    save_path=path, split_ids=split_ids, include_diagnoses=include_diagnoses,
-                    include_measurements =include_measurements, num_threads=num_threads, **kwargs
+                    save_path=path,
+                    split_ids=split_ids,
+                    include_diagnoses=include_diagnoses,
+                    include_measurements=include_measurements,
+                    num_threads=num_threads,
+                    **kwargs
                 )
 
                 # Index the dataset for faster lookups
-                logging.debug(f"Creating file_row_count_dicts for file-index look-ups")
+                logging.debug("Creating file_row_count_dicts for file-index look-ups")
                 hashmap = self.__index_parquet_file_rows(path)
                 with open(self.save_path + f'file_row_count_dict_{split_name}.pickle', 'wb') as handle:
                     pickle.dump(hashmap, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         finally:
             self.collector.disconnect()  # Ensure database is closed properly
-
 
     def __train_test_val_split(self, practice_inclusion_conditions=None):
         """
@@ -185,13 +191,14 @@ class PolarsDataset:
         #    For example, asserting that we only want practices in England can be achieved by adding an inclusion
         #    that applies to the static table
         logging.info(f"Chunking by unique practice ID with {'no' if practice_inclusion_conditions is None else practice_inclusion_conditions} practice inclusion conditions")
-        practice_ids = self.collector._extract_distinct(table_names=["static_table"],
-                                                        identifier_column="PRACTICE_ID",
-                                                        inclusion_conditions=practice_inclusion_conditions
-                                                       )
-        
+        practice_ids = self.collector._extract_distinct(
+            table_names=["static_table"],
+            identifier_column="PRACTICE_ID",
+            inclusion_conditions=practice_inclusion_conditions
+        )
+
         # Create train/test/val splits, each is list of practice_id
-        logging.info(f"Creating train/test/val splits using practice_ids")
+        logging.info("Creating train/test/val splits using practice_ids")
         train_practice_ids, test_practice_ids = sk_split(practice_ids, test_size=0.1)
         test_practice_ids, val_practice_ids = sk_split(test_practice_ids, test_size=0.5)
 
@@ -220,7 +227,7 @@ class PolarsDataset:
         KWARGS:
 
         """
-        logging.debug(f"Generating dataset over practice IDs")
+        logging.debug("Generating dataset over practice IDs")
 
         # Single-threaded execution: Use the persistent SQLite connection
         if num_threads == 1:
@@ -244,7 +251,7 @@ class PolarsDataset:
                 )
                 for split_ids_thread in split_batches)
 
-            total_samples = f"unknown (multi-threaded processing)"
+            total_samples = "unknown (multi-threaded processing)"
 
         else:
             raise NotImplementedError
@@ -253,14 +260,15 @@ class PolarsDataset:
 
         return
 
-    def __save_split_data_to_parquet(self,
-                                     save_path:               str,
-                                     split_ids:               list[str],
-                                     include_diagnoses:       bool,
-                                     include_measurements:    bool,
-                                     collector,
-                                     **kwargs,
-                                    ):
+    def __save_split_data_to_parquet(
+            self,
+            save_path:               str,
+            split_ids:               list[str],
+            include_diagnoses:       bool,
+            include_measurements:    bool,
+            collector,
+            **kwargs,
+    ):
         """
         Writes a chunk of data to Parquet using a **thread-safe SQLite connection**.
             save splits with a hive partitioning
@@ -277,14 +285,15 @@ class PolarsDataset:
 
         # Create the generator, which returns the table contents of qualifying practices one at a time
         # Can process entire list of IDs at once by changing to `distinct_values=[split_ids]`
-        practice_generator = collector._generate_lazy_by_distinct(distinct_values=split_ids,
-                                                                  identifier_column="PRACTICE_ID",
-                                                                  include_diagnoses=include_diagnoses,
-                                                                  include_measurements=include_measurements,
-                                                                  )
+        practice_generator = collector._generate_lazy_by_distinct(
+            distinct_values=split_ids,
+            identifier_column="PRACTICE_ID",
+            include_diagnoses=include_diagnoses,
+            include_measurements=include_measurements,
+        )
 
         try:
-            
+
             desc = f"Thread generating parquet for {len(split_ids)} practices"
             total_samples = 0
             for chunk_name, lazy_table_frames_dict in tqdm(practice_generator, total=len(split_ids), desc=desc):
@@ -303,7 +312,7 @@ class PolarsDataset:
                     # Convert row count to lower cardinality bins for efficient partitioning
                     # ... the smaller the window the more files created + storage space used, and the longer this takes to run
                     # ... but the faster the read efficiency.
-                    df = df.assign(CHUNK = [int(_v / 250) for _v in df['row_nr']])
+                    df = df.assign(CHUNK=[int(_v / 250) for _v in df['row_nr']])
 
                     # Convert to an Apache Arrow Table and save to a partitioned Parquet dataset
                     table = pa.Table.from_pandas(df)
@@ -326,12 +335,12 @@ class PolarsDataset:
         desc = "Getting file row counts. This allows the creation of an index to file map, increasing read efficiency"
         total_count = 0
         for file in tqdm(pathlib.Path(parquet_path).rglob('*.parquet'), desc=desc):
-            num_rows =  pq.ParquetFile(file).metadata.num_rows
+            num_rows = pq.ParquetFile(file).metadata.num_rows
             relative_file_path = str(file)[len(str(parquet_path)):]               # remove the root of the file path
             logging.debug(f"relative_file_path: {relative_file_path}  -  manually done last dataset build, verify this is correct on next run and delete.")
             file_row_counts[file] = num_rows                                      # update hash map
             total_count += num_rows
 
         logging.info(f"\t Obtained with a total of {total_count} samples")
-    
+
         return file_row_counts

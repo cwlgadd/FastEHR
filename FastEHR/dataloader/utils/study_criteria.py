@@ -1,5 +1,5 @@
 import polars as pl
-import logging
+
 
 class index_inclusion_method():
     """
@@ -181,19 +181,25 @@ class index_inclusion_method():
         """
 
         # Get the date at which they turn specified age, and set the date as the index date
+        # This is the earliest possible index date. It would be later if this lies outside of study dates
         patients_with_index_age = (
             lazy_static
             .with_columns((pl.col("YEAR_OF_BIRTH") + pl.duration(days=self._index_on_age * 365.25)).alias("INDEX_DATE"))
-        # This is the earliest possible index date. It would be later if this lies outside of study dates
         )
 
         # Reduce this list to include only patients with the index age occuring during the study period
+        # after study start date
+        # and before study end date
         patients_with_index_age = (
             patients_with_index_age
-            .filter(pl.col('INDEX_DATE') >= pl.lit(self._study_period[0]).str.strptime(pl.Date,
-                                                                                       fmt="%F"))  # after study start date
-            .filter(pl.col('INDEX_DATE') <= pl.lit(self._study_period[1]).str.strptime(pl.Date, fmt="%F"))
-        # and before study end date
+            .filter(
+                pl.col('INDEX_DATE') >= pl.lit(self._study_period[0])
+                .str.strptime(pl.Date, fmt="%F")
+            )
+            .filter(
+                pl.col('INDEX_DATE') <= pl.lit(self._study_period[1])
+                .str.strptime(pl.Date, fmt="%F")
+            )
         )
 
         # # and include only those with the age is within the specified age range - this is a sanity check
@@ -210,8 +216,14 @@ class index_inclusion_method():
         )
 
         # and reduce original frames using this list, adding the new index date to both frames
-        lazy_combined_frame = patients_with_index_age.join(lazy_combined_frame, on=["PATIENT_ID"], how="inner")
-        lazy_static = patients_with_index_age.join(lazy_static.drop("INDEX_DATE"), on=["PATIENT_ID"], how="inner")
+        lazy_combined_frame = (
+            patients_with_index_age
+            .join(lazy_combined_frame, on=["PATIENT_ID"], how="inner")
+        )
+        lazy_static = (
+            patients_with_index_age
+            .join(lazy_static.drop("INDEX_DATE"), on=["PATIENT_ID"], how="inner")
+        )
 
         return lazy_static, lazy_combined_frame
 
@@ -226,45 +238,54 @@ class index_inclusion_method():
         """
 
         # Retain only patients with the required events occurring (at any time)
+        # Include only patients who experienced the events
         if type(self._index_on_event) is list:
             patients_with_index_event = (
                 lazy_combined_frame
                 .filter(pl.col("EVENT").is_in(self._index_on_event))
-            # Include only patients who experienced the events
             )
         else:
             patients_with_index_event = (
                 lazy_combined_frame
                 .filter(pl.col("EVENT") == self._index_on_event)
-            # Include only patients who experienced the events
             )
 
         # Reduce this list to include only patients with the required events occuring during the study period
+        # and before study end date
+        # after study start date
         patients_with_index_event = (
             patients_with_index_event
-            .filter(pl.col('DATE') >= pl.lit(self._study_period[0]).str.strptime(pl.Date,
-                                                                                 fmt="%F"))  # after study start date
-            .filter(pl.col('DATE') <= pl.lit(self._study_period[1]).str.strptime(pl.Date, fmt="%F"))
-        # and before study end date
+            .filter(
+                pl.col('DATE') >= pl.lit(self._study_period[0])
+                .str.strptime(pl.Date, fmt="%F")
+            )
+            .filter(
+                pl.col('DATE') <= pl.lit(self._study_period[1])
+                .str.strptime(pl.Date, fmt="%F")
+            )
         )
 
         # and include only those with these events within the specified age range
+        # index event occurred after minimum age
+        # index event occurred before maximum age
         patients_with_index_event = (
             patients_with_index_event
-            .filter(pl.col('DAYS_SINCE_BIRTH') >= self._age_at_entry_range[
-                0] * 365.25)  # index event occurred after minimum age
-            .filter(pl.col('DAYS_SINCE_BIRTH') <= self._age_at_entry_range[1] * 365.25)
-        # index event occurred before maximum age
+            .filter(
+                pl.col('DAYS_SINCE_BIRTH') >= self._age_at_entry_range[0] * 365.25
+            )
+            .filter(
+                pl.col('DAYS_SINCE_BIRTH') <= self._age_at_entry_range[1] * 365.25
+            )
         )
 
         # Get the first valid index event if multiple exist (e.g. repeat diagnosis, multiple index events considered), and set the date as the index date
+        # This is the earliest possible index date. It would be later if this lies outside of study dates
         patients_with_index_event = (
             patients_with_index_event
             .sort(["PRACTICE_ID", "PATIENT_ID", "DATE"])  # Sort to ensure date order within patients
             .unique(subset=["PRACTICE_ID", "PATIENT_ID"],
                     keep="first")  # Keep chronologically first required event experienced by patient
             .with_columns((pl.col('DATE').alias('INDEX_DATE')))
-        # This is the earliest possible index date. It would be later if this lies outside of study dates
         )
 
         # Get this patient list
@@ -376,11 +397,11 @@ class index_inclusion_method():
             )
 
         # Retain those occurring after index, and before study end
+        # Only look at outcomes within study period
         lazy_combined_frame_outcomes = (
             lazy_combined_frame_outcomes
             .filter(pl.col("DATE") > pl.col("INDEX_DATE"))
             .filter(pl.col("DATE") <= pl.lit(self._study_period[1]).str.strptime(pl.Date, fmt="%F"))
-        # Only look at outcomes within study period
         )
 
         # Get outcomes
@@ -392,31 +413,31 @@ class index_inclusion_method():
             #    it has not occurred by the end of the study period.
 
             # Get last observation within study period
+            # Keep chronologically last event experienced by patient
             lazy_combined_frame_last_event_in_study = (
                 lazy_combined_frame
                 .filter(pl.col("DATE") <= pl.lit(self._study_period[1]).str.strptime(pl.Date,
                                                                                      fmt="%F"))  # Only look at events within study period
                 .sort(["PRACTICE_ID", "PATIENT_ID", "DATE"])  # Sort to ensure date order within patients
                 .unique(subset=["PRACTICE_ID", "PATIENT_ID"], keep="last")
-            # Keep chronologically last event experienced by patient
             )
 
             # Take first between these - this will be the first outcome if one has occurred, otherwise the last event
+            # Keep chronologically last event experienced by patient
             outcome = (
                 pl.concat([lazy_combined_frame_outcomes, lazy_combined_frame_last_event_in_study])
                 .sort(["PRACTICE_ID", "PATIENT_ID", "DATE"])  # Sort to ensure date order within patients
                 .unique(subset=["PRACTICE_ID", "PATIENT_ID"], keep="first")
-            # Keep chronologically last event experienced by patient
             )
 
         else:
 
             # Take first of the valid outcomes
+            # Keep chronologically last event experienced by patient
             outcome = (
                 lazy_combined_frame_outcomes
                 .sort(["PRACTICE_ID", "PATIENT_ID", "DATE"])  # Sort to ensure date order within patients
                 .unique(subset=["PRACTICE_ID", "PATIENT_ID"], keep="first")
-            # Keep chronologically last event experienced by patient
             )
 
             # Unlike the above case, where we know every patient will have a valid outcome, here some will now be excluded.

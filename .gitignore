@@ -59,3 +59,4 @@ docs/_build/
 **/*.nbconvert.ipynb
 **/*.out
 
+/examples/3_build_fine_tuning_datasets/old/

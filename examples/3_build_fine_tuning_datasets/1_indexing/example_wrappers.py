@@ -1,6 +1,5 @@
-import polars as pl
-import logging
 from FastEHR.dataloader.utils.study_criteria import index_inclusion_method
+
 
 def t2d_inclusion_method(index_on_event="TYPE2DIABETES",
                          outcomes=["IHDINCLUDINGMI_OPTIMALV2",
@@ -69,7 +68,7 @@ def multimorbidity_inclusion_method(index_on_age=50,
                                     age_at_entry_range=[25, 85],
                                     min_registered_years=1,
                                     min_events=2,
-                                   ):
+                                    ):
 
     # Custom function which is used as a filter on the dynamic frame to select outcomes as events which are a diagnosis.
     #  In our CPRD example, all diagnoses are coded as full capitals, so we can distinguish them this way
@@ -77,10 +76,10 @@ def multimorbidity_inclusion_method(index_on_age=50,
         return s.isupper()          # Keep only strings with all capital letters
 
     mm_inclusion = index_inclusion_method(index_on=index_on_age,
-                                           outcomes=custom_mm_filter,
-                                           study_period=study_period,
-                                           age_at_entry_range=age_at_entry_range,
-                                           min_registered_years=min_registered_years,
-                                           min_events=min_events,
-                                           )
+                                          outcomes=custom_mm_filter,
+                                          study_period=study_period,
+                                          age_at_entry_range=age_at_entry_range,
+                                          min_registered_years=min_registered_years,
+                                          min_events=min_events,
+                                          )
     return mm_inclusion.fit

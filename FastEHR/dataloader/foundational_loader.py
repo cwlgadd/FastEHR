@@ -1,47 +1,36 @@
-from sklearn.model_selection import train_test_split as sk_split
-from sklearn.preprocessing import OneHotEncoder
+import os
+import time
+import logging
+import pickle
+from abc import ABC
+from pathlib import Path
+from typing import Optional
+
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
-from torch.nn.utils.rnn import pad_sequence
-import pytorch_lightning as pl
-import polars as plr
 import pyarrow.parquet as pq
-import pyarrow.dataset as ds
-from abc import ABC
-from textwrap import wrap
-from typing import Optional
-from collections import defaultdict
-import os
+import pytorch_lightning as pl
+from sklearn.preprocessing import OneHotEncoder
+from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
+
 from FastEHR.dataloader.dataset.dataset_polars import PolarsDataset
-from FastEHR.dataloader.tokenizers_local.base import TokenizerBase
-from FastEHR.dataloader.tokenizers_local.tokenizers_local import NonTabular, Tabular
-import random
-import logging
-from pathlib import Path
-from tqdm import tqdm
-import pickle
-import copy
+from FastEHR.dataloader.tokenizers_local import TokenizerBase
+from FastEHR.dataloader.tokenizers_local import NonTabular, Tabular
 
-# Testing modules
-import sqlite3
-
-import time
 
 class FoundationalDataModule(pl.LightningDataModule, ABC):
     """
     PyTorch-Lightning datamodule for foundational models
-    
+
     ARGS:
         practice_patient_id (list[str])
             List of practice patient identifiers which satisfy study criteria.
-            
+
     KWARGS:
-        batch_size (int): 
-        
-        unk_freq_threshold (float). 
-            
-        
+        batch_size (int):
+
+        unk_freq_threshold (float).
     """
 
     @property
@@ -49,34 +38,38 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
         return self.collate_fn.supervised
 
     @property
-    def context_time_scale(selfs):
+    def context_time_scale(self):
         return self.train_set.time_scale
 
     @property
     def supervised_time_scale(self):
-        return self.train_set.time_scale * self.collate_fn.supervised_time_scale
-    
-    def __init__(self, 
-                 path_to_db:                 str,
-                 path_to_ds:                 str,
-                 load:                       bool,
-                 tokenizer:                  str = "tabular",
-                 batch_size:                 int = 64,
-                 min_workers:                int = 1,
-                 overwrite_practice_ids:     Optional[str] = None,
-                 overwrite_meta_information: Optional[str] = None,
-                 supervised:                 bool = False,
-                 supervised_time_scale:      float = 1.0,
-                 subsample_training:         Optional[int] = None,
-                 seed:                       int = 42,
-                 **kwargs   
-                ):
-        """
-        Initializes the `FoundationalDataModule`, a PyTorch Lightning DataModule for foundational models.
+        return (self.train_set.time_scale
+                * self.collate_fn.supervised_time_scale)
 
-        This module handles data loading, preprocessing, and batching for training, validation, and testing.
-        It supports both supervised and unsupervised learning tasks and integrates tokenization, meta-information
-        loading, and dataset preparation.
+    def __init__(
+            self,
+            path_to_db:                 str,
+            path_to_ds:                 str,
+            load:                       bool,
+            tokenizer:                  str = "tabular",
+            batch_size:                 int = 64,
+            min_workers:                int = 1,
+            overwrite_practice_ids:     Optional[str] = None,
+            overwrite_meta_information: Optional[str] = None,
+            supervised:                 bool = False,
+            supervised_time_scale:      float = 1.0,
+            subsample_training:         Optional[int] = None,
+            seed:                       int = 42,
+            **kwargs
+    ):
+        """
+        Initializes the `FoundationalDataModule`, a PyTorch Lightning
+        DataModule for foundational models.
+
+        This module handles data loading, preprocessing, and batching for
+         training, validation, and testing. It supports both supervised
+         and unsupervised learning tasks and integrates tokenization,
+          meta-information loading, and dataset preparation.
 
         Parameters
         ----------
@@ -84,11 +77,13 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
             Full path to the SQLite database folder.
 
         path_to_ds : str
-            Full path to the preprocessed dataset folder, either for loading or saving data.
+            Full path to the preprocessed dataset folder, either for loading
+            or saving data.
 
         load : bool
             If `True`, loads preprocessed dataset from Parquet files.
-            If `False`, processes raw SQLite data and saves it as Parquet files.
+            If `False`, processes raw SQLite data and saves it as Parquet
+             files.
 
         tokenizer : str, optional, default="tabular"
             Specifies which tokenizer to use.
@@ -102,53 +97,68 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
             Minimum number of workers used for data loading.
 
         overwrite_practice_ids : str, optional
-            Path to a file containing new practice ID allocations for train/test/validation splits.
-            This prevents data leakage when creating fine-tuning datasets.
+            Path to a file containing new practice ID allocations for
+             train/test/validation splits. This prevents data leakage when
+             creating fine-tuning datasets.
 
         overwrite_meta_information : str, optional
-            Path to an existing meta-information pickle file.
-            If provided, it prevents redundant preprocessing of meta-information.
+            Path to an existing meta-information pickle file. If provided,
+             it prevents redundant preprocessing of meta-information.
 
         supervised : bool, optional, default=False
             If `True`, enables supervised training mode.
 
         supervised_time_scale: float, optional, default 3650.0
-            The scaling factor applied to any supervised target times produced in the Collator (default: 10 years). This
-            is multiplicative with the time_scale in FoundationalDataset.
+            The scaling factor applied to any supervised target times produced
+             in the Collator (default: 10 years). This is multiplicative with
+             the time_scale in FoundationalDataset.
 
         subsample_training : int, optional
-            If specified, reduces the training dataset to a random subset of this size.
+            If specified, reduces the training dataset to a random subset of
+             this size.
 
         seed : int, optional
-            If specified, the seed used for reducing the training dataset to a random subset of this size.
+            If specified, the seed used for reducing the training dataset to a
+             random subset of this size.
 
         **kwargs
             Additional keyword arguments passed to PolarsDataset.fit()
 
         Notes
         -----
-        - Loads tokenizer vocabulary from meta-information and initializes dataset splits.
+        - Loads tokenizer vocabulary from meta-information and initializes
+           dataset splits.
         - Supports dataset reprocessing or direct loading from Parquet files.
-        - Uses `Collator` for batch collation, which supports both causal and non-causal tasks.
-        - Handles training, validation, and test dataset creation with tokenization.
+        - Uses `Collator` for batch collation, which supports both causal
+           and non-causal tasks.
+        - Handles training, validation, and test dataset creation with
+           tokenization.
         """
 
         super().__init__()
 
         self.batch_size = batch_size
         self.min_workers = min_workers
-        self.collate_fn = Collator(supervised=supervised, supervised_time_scale=supervised_time_scale)
-        
-        # Get the DL friendly representation, either by loading or building from scratch.
+        self.collate_fn = Collator(
+            supervised=supervised,
+            supervised_time_scale=supervised_time_scale
+        )
+
+        # Get the DL friendly representation, either by loading or building
+        #  from scratch.
         if load is False:
             polars_dataset = PolarsDataset(path_to_db=path_to_db)
-            polars_dataset.fit(path=path_to_ds,
-                               overwrite_practice_ids=overwrite_practice_ids,
-                               overwrite_meta_information=overwrite_meta_information,
-                               **kwargs)
+            polars_dataset.fit(
+                path=path_to_ds,
+                overwrite_practice_ids=overwrite_practice_ids,
+                overwrite_meta_information=overwrite_meta_information,
+                **kwargs
+            )
 
         # Load meta information
-        meta_path = path_to_ds + "meta_information.pickle" if overwrite_meta_information is None else overwrite_meta_information
+        meta_path = path_to_ds + "meta_information.pickle" \
+            if overwrite_meta_information is None \
+            else overwrite_meta_information
         with open(meta_path, 'rb') as f:
             self.meta_information = pickle.load(f)
             logging.info(f"Using meta information from {meta_path}")
@@ -158,49 +168,84 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
             file_row_path = path_to_ds + f"file_row_count_dict_{_key}.pickle"
             with open(file_row_path, 'rb') as f:
                 file_row_count_dicts[_key] = pickle.load(f)
-                logging.info(f"Using {_key} file-row count dictionary from {file_row_path}")
-    
-        # Create tokenizer, and build based on vocabulary from training set. 
-        #   Vocabularly begins with the PAD (padding) token, then the UNK (unknown) token, and is then ordered by token frequency        
-        self.tokenizer = Tabular() if tokenizer.lower() == "tabular" else NonTabular()
+                logging.info(
+                    f"Using {_key} file-row count dict from {file_row_path}"
+                )
+
+        # Create tokenizer, and build based on vocabulary from training set.
+        #   Vocabularly begins with the PAD (padding) token, then the UNK
+        #   (unknown) token, and is then ordered by token frequency
+        self.tokenizer = Tabular() \
+            if tokenizer.lower() == "tabular" \
+            else NonTabular()
         self.tokenizer.fit(self.meta_information, **kwargs)
-        logging.info(f"Using {tokenizer} tokenizer, created from meta information and containing {self.tokenizer.vocab_size} tokens")
-        
+        logging.info(
+            f"Using {tokenizer} tokenizer, "
+            f"created from meta information "
+            f"and containing {self.tokenizer.vocab_size} tokens"
+        )
+
         # Train/test/validation GenerativeDatasets
-        dataset_args = {"tokenizer": self.tokenizer, "meta_information": self.meta_information}
-        self.train_set = FoundationalDataset(path_to_ds, "train", **dataset_args, file_row_count_dict=file_row_count_dicts["train"], **kwargs,
-                                             subsample=subsample_training, seed=seed)
-        self.test_set = FoundationalDataset(path_to_ds, "test", **dataset_args, file_row_count_dict=file_row_count_dicts["test"], **kwargs)
-        self.val_set = FoundationalDataset(path_to_ds, "val", **dataset_args, file_row_count_dict=file_row_count_dicts["val"], **kwargs)
+        dataset_args = {
+            "tokenizer": self.tokenizer,
+            "meta_information": self.meta_information
+        }
+        self.train_set = FoundationalDataset(
+            path_to_ds,
+            split="train",
+            **dataset_args,
+            file_row_count_dict=file_row_count_dicts["train"],
+            **kwargs,
+            subsample=subsample_training,
+            seed=seed
+        )
+        self.test_set = FoundationalDataset(
+            path_to_ds,
+            split="test",
+            **dataset_args,
+            file_row_count_dict=file_row_count_dicts["test"],
+            **kwargs
+        )
+        self.val_set = FoundationalDataset(
+            path_to_ds,
+            split="val",
+            **dataset_args,
+            file_row_count_dict=file_row_count_dicts["val"],
+            **kwargs
+        )
 
     def standardise(self, event, value):
         # Standardise a single value and event
         if event in list(self.meta_information["measurement_tables"].event):
-            _row = self.meta_information["measurement_tables"][self.meta_information["measurement_tables"].event==event]
+            _row = self.meta_information["measurement_tables"][
+                self.meta_information["measurement_tables"].event == event
+            ]
             _lqr = _row["approx_lqr"].to_numpy()[0]
             _uqr = _row["approx_uqr"].to_numpy()[0]
-            return float(( value - _lqr ) /  (_uqr - _lqr)) - 0.5
+            return float((value - _lqr) / (_uqr - _lqr)) - 0.5
         else:
             return value
-        
+
     def unstandardise(self, event, value):
         if event in list(self.meta_information["measurement_tables"].event):
-            _row = self.meta_information["measurement_tables"][self.meta_information["measurement_tables"].event==event]
+            _row = self.meta_information["measurement_tables"][
+                self.meta_information["measurement_tables"].event == event
+            ]
             _lqr = _row["approx_lqr"].to_numpy()[0]
             _uqr = _row["approx_uqr"].to_numpy()[0]
-            return float(( (value + 0.5) * (_uqr - _lqr) ) + _lqr)    
+            return float(((value + 0.5) * (_uqr - _lqr)) + _lqr)
         else:
             return value
-    
-    def encode(self, sequence:list[str]):
+
+    def encode(self, sequence: list[str]):
         return self.train_set.tokenizer.encode(sequence)
 
-    def decode(self, sequence:list[int]):
+    def decode(self, sequence: list[int]):
         return self.train_set.tokenizer.decode(sequence)
 
     def train_dataloader(self):
         """"""
-        return DataLoader(            
+        return DataLoader(
             dataset=self.train_set,
             batch_size=self.batch_size,
             num_workers=np.min((self.min_workers, os.cpu_count())),
@@ -231,7 +276,7 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
             shuffle=False
         )
 
-    
+
 class FoundationalDataset(Dataset):
     """
     """
@@ -244,7 +289,7 @@ class FoundationalDataset(Dataset):
 
         if report_time:
             elapsed_time = time.time() - start_time
-            print(f"Time to retrieve sample index {idx}: {elapsed_time:.4f} seconds\n")
+            print(f"Time to retrieve: {elapsed_time:.4f} seconds\n")
 
         # Static covariates
         static = self._decode_covariates(batch["static_covariates"])
@@ -253,42 +298,64 @@ class FoundationalDataset(Dataset):
 
         # Dynamic events
         print(f"Sequence of {len(batch['ages'])} events")
-        print("\n" + "Token".ljust(76) + "| Age at event (days)".ljust(30) + "| Standardized value".ljust(20))
-        print("=" * 125)
+        print("\nToken".ljust(76)
+              + "| Age at event (days)".ljust(30)
+              + "| Standardized value".ljust(20)
+              + "\n"
+              + "=" * 125
+              )
 
         tokens = self.tokenizer.decode(batch["tokens"].tolist()).split(" ")
 
-        for idx_event, (token, age, value) in enumerate(zip(tokens, batch["ages"], batch["values"])):
-            print(f"{token.ljust(75)}| {str(int(age * self.time_scale)).ljust(30)}| {value:.2f}".ljust(20))
+        zipped = zip(tokens, batch["ages"], batch["values"])
+        for idx_event, (token, age, value) in enumerate(zipped):
+            print(f"{token.ljust(75)}"
+                  f"| {str(int(age * self.time_scale)).ljust(30)}"
+                  f"| {value:.2f}".ljust(20))
 
-            if max_dynamic_events is not None and idx_event >= max_dynamic_events - 1:
+            at_limit = (
+                    max_dynamic_events is not None
+                    and idx_event >= max_dynamic_events - 1
+            )
+            if at_limit:
                 break
 
         print("="*125)
 
         return
-        
-    def __init__(self,
-                 parquet_path:                 str, 
-                 split:                        str,
-                 tokenizer:                    TokenizerBase,
-                 meta_information:             dict,
-                 file_row_count_dict:          dict,
-                 max_seq_length:               int = 256,
-                 standardise_values:           bool = True,
-                 global_diagnoses:             bool = False,
-                 repeating_events:             bool = True,
-                 random_context_window:        bool = False,
-                 time_scale:                   float=1825.0,                     # Scale by 5 years so when we model on unit interval, we look 5 years ahead
-                 subsample:                    Optional[int] = None,
-                 seed:                         int=42,
-                 **kwargs
-                ):
-        """
-        Initialize the `FoundationalDataset`, a dataset class for foundational model training.
 
-        This dataset is constructed from preprocessed Parquet files and provides tokenized and structured
-        sequences of events, including dynamic and static features.
+    @property
+    def meta_static(self):
+        return self.meta_information["static_table"]
+
+    @property
+    def meta_measurement(self):
+        return self.meta_information["measurement_tables"]
+
+    def __init__(
+            self,
+            parquet_path:                 str,
+            split:                        str,
+            tokenizer:                    TokenizerBase,
+            meta_information:             dict,
+            file_row_count_dict:          dict,
+            max_seq_length:               int = 256,
+            standardise_values:           bool = True,
+            global_diagnoses:             bool = False,
+            repeating_events:             bool = True,
+            random_context_window:        bool = False,
+            time_scale:                   float = 1825.0,
+            subsample:                    Optional[int] = None,
+            seed:                         int = 42,
+            **kwargs
+    ):
+        """
+        Initialize the `FoundationalDataset`, a dataset class for foundational
+        model training.
+
+        This dataset is constructed from preprocessed Parquet files and
+        provides tokenized and structured sequences of events, including
+        dynamic and static features.
 
         Parameters
         ----------
@@ -302,19 +369,23 @@ class FoundationalDataset(Dataset):
             Tokenizer used for encoding event sequences.
 
         meta_information : dict
-            Dictionary containing meta-information about the dataset, including measurement statistics.
+            Dictionary containing meta-information about the dataset,
+            including measurement statistics.
 
         file_row_count_dict : dict
-            Dictionary mapping Parquet filenames to the number of rows they contain.
+            Dictionary mapping Parquet filenames to the number of rows they
+            contain.
 
         max_seq_length : int, optional, default=256
-            The maximum number of tokens in a sequence. Longer sequences are truncated.
+            The maximum number of tokens in a sequence. Longer sequences are
+            truncated.
 
         standardise_values : bool, optional, default=True
             Whether to standardize event values based on dataset statistics.
 
         global_diagnoses : bool, optional, default=False
-            If True, ensures all historical diagnoses are included in each sequence's context window.
+            If True, ensures all historical diagnoses are included in each
+            sequence's context window.
 
         repeating_events : bool, optional, default=True
             Whether to allow repeated events within a sequence.
@@ -323,30 +394,36 @@ class FoundationalDataset(Dataset):
             These may still fall outside of a context window.
 
         random_context_window : bool, optional, default=False
-            Whether to randomly sample context windows or use the latest events.
+            Whether to randomly sample context windows or use the latest
+             events.
 
         time_scale : float, optional, default=1825.0
-            The scaling factor applied to age values (default: 5 years).
+            The scaling factor applied to age values (default: 5 years so a
+             model using unit interval looks 5 years ahead)
 
         subsample : int, optional
-            If specified, limits the dataset to a random subsample of this size.
+            If specified, limits the dataset to a random subsample of this
+            size.
 
         Notes
         -----
-        - The dataset loads preprocessed patient event sequences and encodes them using the tokenizer.
+        - The dataset loads preprocessed patient event sequences and encodes
+            them using the tokenizer.
         - Supports both fixed-length and randomly sampled context windows.
-        - Static covariates are one-hot encoded and stored separately from dynamic sequences.
-        - The dataset length is computed based on the sum of row counts across Parquet files.
+        - Static covariates are one-hot encoded and stored separately from
+            dynamic sequences.
+        - The dataset length is computed based on the sum of row counts across
+            Parquet files.
         """
 
         super().__init__()
-        
+
         self.parquet_path = parquet_path
         self.sub_dir = f"split={split}/"
         self.tokenizer = tokenizer
         self.max_seq_length = max_seq_length
         self.standardise_values = standardise_values
-        self.global_diagnoses = global_diagnoses 
+        self.global_diagnoses = global_diagnoses
         self.repeating_events = repeating_events
         self.random_context_window = random_context_window
         self.meta_information = meta_information
@@ -357,88 +434,125 @@ class FoundationalDataset(Dataset):
         np.random.seed(self.seed)
         logging.info(f"Set seed to {self.seed}")
 
-        # Create a PyArrow dataset directly from the PolarsDataset saved hive partitioned dataset
-        # NOTE:   This can take some time to initialise, but using the API is cleaner
-        # self.dataset = pq.ParquetDataset(parquet_path + self.sub_dir, validate_schema=False)
-        # self.dataset = ds.dataset(parquet_path + self.sub_dir, format="parquet", partitioning="hive")
-        # These are really slow options, creation takes a ds.dataset: 70 secs, vs.  pq.Parquet: 133 secs.
+        # Create a PyArrow dataset directly from the PolarsDataset saved hive
+        # partitioned dataset
+        # NOTE:   This can take some time to initialise, but using the API is
+        # cleaner
+        # self.dataset = pq.ParquetDataset(
+        #     parquet_path + self.sub_dir, validate_schema=False
+        # )
+        # self.dataset = ds.dataset(
+        #     parquet_path + self.sub_dir, format="parquet", partitioning="hive"
+        # )
+        # These are really slow options,
+        #   creation takes a ds.dataset: 70 secs, vs.  pq.Parquet: 133 secs.
         # Then the APIs for taking items is also really slow:
-        #    e.g. `self.dataset.take([idx]).to_pandas().loc[0]` for `ds.dataset`                                
-        #     or   filtering predicates `filter=(ds.field('CHUNK') == chunk ) & (ds.field('row_nr') == index)`  -> 0.5 sec/read
-        #    NOTE: row_nr is now the number within a practice ID, so this may not work now
+        #    e.g. `self.dataset.take([idx]).to_pandas().loc[0]` for `ds.dataset`
+        #     or   filtering predicates `filter=(ds.field('CHUNK') == chunk ) & \
+        #                   (ds.field('row_nr') == index)`  -> 0.5 sec/read
+        #    NOTE: row_nr is now the number within a practice ID, so this may not work
         #    TODO: is there a way to simplify code using PyArrow that retains speed?
         self.file_row_count_dict = file_row_count_dict
-        # Pre-calculate total number of samples (patients) on initialisation        
-        # NOTE:   Updating to the ds.dataset API (instead of previously using custom a hash map) now means the dataset 
-        #         length is being calculated every initialisation - this is very slow (~13 mins) as it needs to touch every file.
-        #         Fortunately pyarrow saves total row count of each file in the footer, so we dont need to load the data.
-        #         Consider caching this sum somewhere when building dataset. E.g. in meta information? Currently I can't
-        #         extract it from here as this information isn't aggregated across train/test/val splits.
+        # Pre-calculate total number of samples (patients) on initialisation
+        # NOTE:   Updating to the ds.dataset API (instead of previously using custom a
+        # hash map) now means the dataset length is being calculated every initialisation
+        # - this is very slow (~13 mins) as it needs to touch every file. Fortunately
+        # pyarrow saves total row count of each file in the footer, so we dont need to
+        # load the data. Consider caching this sum somewhere when building dataset.
+        # E.g. in meta information? Currently I can't extract it from here as this
+        # information isn't aggregated across train/test/val splits.
         dataset_path = self.parquet_path + self.sub_dir
+        logging.info(f"Loaded {dataset_path} dataset")
+
         self.total_samples = sum(self.file_row_count_dict.values())
         if self.subsample is None:
-            logging.info(f"Loaded {dataset_path} dataset, with {self.total_samples:,} samples")
-        else: 
-            logging.info(f"Loaded {dataset_path} dataset, with {self.subsample} subsamples out of {self.total_samples:,}")
-            self.subsample_indicies = np.random.randint(low=0, high=self.total_samples, size=self.subsample)
+            logging.info(f"with {self.total_samples:,} samples")
+        else:
+            logging.info(f"with {self.subsample} subsamples "
+                         f"out of {self.total_samples:,}")
+            self.subsample_indicies = (
+                np.random.randint(low=0,
+                                  high=self.total_samples,
+                                  size=self.subsample)
+            )
             self.total_samples = self.subsample
 
         # Create one-hot encoder map for static categorical variables.
-        #   Note we use one hot even when the data is ordinal (e.g. with IMD deprivation score) so we can include the predict with missing data at inference time
+        #   Note we use one hot even when the data is ordinal (e.g. with IMD
+        #   deprivation score) so we can include the predict with missing
+        #   data at inference time
         self.static_1hot = {}
-        for _key in self.meta_information["static_table"].keys():
+        for _key in self.meta_static.keys():
             encoder = OneHotEncoder(handle_unknown='error')
-            encoder.fit([[cat] for cat in self.meta_information["static_table"][_key]["category"]])
+            cats = self.meta_static[_key]["category"]
+            encoder.fit([
+                [cat] for cat in cats
+            ])
             self.static_1hot[_key] = encoder
 
     def __len__(self):
-        """ 
+        """
             Get the total number of rows across all Parquet files.
         """
         return self.total_samples
-    
+
     def __getitem__(self, idx):
         r"""
-            Get a single item from the dataset, 
-            
+            Get a single item from the dataset,
+
             tokenized and padded event stream and static variables
         """
 
         if self.subsample is not None:
             idx = self.subsample_indicies[idx]
-            
+
         return self.getitem(idx)
 
     def getitem(self, idx):
-        
+
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
         # Determine which file and row the idx corresponds to.
         #    TODO: replace with a better sorting algorithm.
-        #          Can use the fact that most files have a maximum number of rows to 
-        #          estimate where to start search.
+        #          Can use the fact that most files have a maximum
+        #          number of rows to estimate where to start search.
         for file in self.file_row_count_dict.keys():
             if idx >= self.file_row_count_dict[file]:
                 idx -= self.file_row_count_dict[file]
             else:
                 break
-                
+
         # Read the corresponding row from the Parquet dataset
         try:
             if Path(file).is_file():
                 # Current version
-                row_df = pq.read_table(file).to_pandas().loc[idx]  
-                
+                row_df = (
+                    pq.read_table(file)
+                    .to_pandas()
+                    .loc[idx]
+                )
+
             elif Path(self.parquet_path + self.sub_dir + file).is_file():
-                 # Old version of this code produced datasets with dictionaries that only stored the filename, catch them
-                row_df = pq.read_table(self.parquet_path + self.sub_dir + file).to_pandas().loc[idx]
-                
+                # Old version:
+                # Datasets with dictionaries that only stored the filename
+                logging.warning("This is an older dataset naming convention.")
+                row_df = (
+                    pq.read_table(self.parquet_path + self.sub_dir + file)
+                    .to_pandas()
+                    .loc[idx]
+                )
+
             else:
                 raise FileNotFoundError
 
-        except:
-            raise ValueError(f"No data found for index {idx} from file {self.parquet_path}{self.sub_dir}{file}, with file rowcount {self.file_row_count_dict[file]}")
+        except Exception as e:
+            logging.error(f"Raised exception {e}")
+            raise ValueError(
+                f"No data found for index {idx} "
+                f"from file {self.parquet_path}{self.sub_dir}{file}, "
+                f" with file rowcount {self.file_row_count_dict[file]}"
+            )
 
         # Static variables
         ##################
@@ -448,55 +562,76 @@ class FoundationalDataset(Dataset):
         ##################
         # Unpack rows, and optionally standardise values
         sequence_tokens, sequence_values, sequence_ages = [], [], []
-        for next_event, next_value, next_age in zip(row_df["EVENT"], row_df["VALUE"], row_df["DAYS_SINCE_BIRTH"]):
-    
-            ## TOKENS
+        zipped = zip(row_df["EVENT"],
+                     row_df["VALUE"],
+                     row_df["DAYS_SINCE_BIRTH"])
+        for next_event, next_value, next_age in zipped:
+
+            # TOKENS
             ##########
-            # e.g. ["bmi", "DEPRESSION", "bmi", ...] 
+            # e.g. ["bmi", "DEPRESSION", "bmi", ...]
             sequence_tokens.append(next_event)
 
-            ## VALUES
+            # VALUES
             #########
             # Manual removal of some quirky values from DExtER
             if next_event in ["Ex_smoker_84", "Never_smoked_tobacco_85"]:
                 next_value = np.nan
-            
-            # e.g.  [23.3, np.nan, 27.7, ...] if not standardising, else [0.12, np.nan, 0.23, ...]
+
+            # e.g.  [23.3, np.nan, 27.7, ...] if not standardising,
+            #       else [0.12, np.nan, 0.23, ...]
             if next_value is None:
-                # If the next token does not have a value then we just set it as np.nan
+                # If the next token does not have a value then we just
+                # set it as np.nan
                 next_value = np.nan
             else:
                 # Else we can continue to process it
-                event_meta = self.meta_information["measurement_tables"][self.meta_information["measurement_tables"].event == next_event]   
-                if next_event in self.meta_information["measurement_tables"].event.tolist():
-                    lqr, uqr = event_meta.approx_lqr.to_numpy()[0], event_meta.approx_uqr.to_numpy()[0]
+                event_meta = self.meta_measurement[
+                    self.meta_measurement.event == next_event
+                ]
+                if next_event in self.meta_measurement.event.tolist():
+                    lqr = event_meta.approx_lqr.to_numpy()[0]
+                    uqr = event_meta.approx_uqr.to_numpy()[0]
                 else:
                     lqr, uqr = -np.inf, np.inf
-                    
+
                 # Define outlier boundaries based on quantiles
                 if next_value < lqr or next_value > uqr:
-                    # If it does have a value, but this is an outlier, we set it as np.nan which is the same way we record missing values above
+                    # If it does have a value, but this is an outlier,
+                    # we set it as np.nan which is the same way we record
+                    # missing values above
                     next_value = np.nan
                 else:
-                    if self.standardise_values and next_event in self.meta_information["measurement_tables"].event.tolist():
-                        # Else we can optionally continue by standardising it to [0,1]
-                        next_value = (next_value -lqr) / (uqr - lqr)
+                    # Else can optionally standardise it to [0,1]
+                    should_standardise = (
+                            self.standardise_values and
+                            next_event in self.meta_measurement.event.tolist()
+                    )
+                    if should_standardise:
+                        next_value = (next_value - lqr) / (uqr - lqr)
 
-                        # But if we use a joint data embedding we will be scaling token embeddings by the value, and so we 
-                        # instead scale to [-0.5,0.5], so the scaling is symetric around the average value of the token.
-                        # this still leads to strong assumptions with this embedding choice (that average values are not meaningful)
-                        next_value = next_value - 0.5 
+                        # But if we use a joint data embedding we will be
+                        # scaling token embeddings by the value, and so we
+                        # instead scale to [-0.5,0.5], so the scaling is
+                        # symetric around the average value of the token.
+                        # This still leads to strong assumptions with this
+                        # embedding choice (that average values are not
+                        # meaningful)
+                        next_value = next_value - 0.5
 
             sequence_values.append(float(next_value))
 
-            ## AGES
+            # AGES
             ########
             # e.g. [6661, 7569, 7866, ...]
             sequence_ages.append(next_age)
 
         # Optionally, keep only the last record of each event
         if not self.repeating_events:
-            last_unique_indices  = sorted({x: i for i, x in enumerate(sequence_tokens)}.values())   # Get the indices of the last record of each seen event.
+            # Get the indices of the last record of each seen event.
+            last_unique_indices = sorted(
+                {x: i for i, x in enumerate(sequence_tokens)}.values()
+            )
             sequence_tokens = [sequence_tokens[i] for i in last_unique_indices]
             sequence_values = [sequence_values[i] for i in last_unique_indices]
             sequence_ages = [sequence_ages[i] for i in last_unique_indices]
@@ -507,7 +642,7 @@ class FoundationalDataset(Dataset):
             # #     E.g. events = ["bmi", "DEPRESSION", "bmi"] and values = [23.3, None, 27.7] --> merge to --> "bmi", "2", "3", ".", "3", "DEPRESSION", "bmi", "2", "7", ".", "7""
             # #          ages   = [6661, 7569, 7866] --> merge to --> [6661,6661,6661,6661,6661,7569, ...]
             # sequence_tokens = [[_event] + wrap(str(_value), 1) if _value is not np.nan else [_event] for _event, _value in zip(sequence_tokens, sequence_values)]
-            # sequence_tokens = sum(sequence_tokens, [])        # concat list of lists            
+            # sequence_tokens = sum(sequence_tokens, [])        # concat list of lists
             # sequence_ages = [[_age] + [_age for _ in range(len(str(_value)))] if _value is not np.nan else [_age] for _age, _value in zip(sequence_ages, sequence_values)]
             # sequence_ages = sum(sequence_ages, [])            # concat list of lists
             # sequence_values = [np.nan for _ in range(len(sequence_tokens))]
@@ -515,38 +650,45 @@ class FoundationalDataset(Dataset):
         # Then encode the sequence
         ##########################
         encoded_tokens = self.tokenizer.encode(sequence_tokens)
-        # Get a windowed sub-block from the patient's history if context length exceeds block size        
+        # Get a windowed sub-block from the patient's history if context length exceeds block size
         if self.random_context_window:
             start_pos = np.random.randint(low=0, high=len(encoded_tokens)-self.max_seq_length, size=1)[0] if len(encoded_tokens) > self.max_seq_length else 0
         else:
             start_pos = len(encoded_tokens)-self.max_seq_length if len(encoded_tokens) > self.max_seq_length else 0
         end_pos = start_pos + self.max_seq_length
-        
-        # Get the diagnoses that we will (optionally) not be dropping, as these have life long implications        
+
+        # Get the diagnoses that we will (optionally) not be dropping, as these have life long implications
         if self.global_diagnoses:
             # Replace the first X events with the diagnoses that occurred before this sampled context block
             earlier_global_events = self.tokenizer.encode([_event for _event in sequence_tokens[:start_pos]
                                                            if _event in self.meta_information["diagnosis_table"].event.tolist()])
-            earlier_global_ages = [ _age for _event, _age in zip(sequence_tokens[:start_pos], sequence_ages[:start_pos]) 
-                                   if _event in self.meta_information["diagnosis_table"].event.tolist()]
-            earlier_global_values = [_value for _event, _value in zip(sequence_tokens[:start_pos], sequence_values[:start_pos]) 
-                                     if _event in self.meta_information["diagnosis_table"].event.tolist()]
+            earlier_global_ages = [
+                _age
+                for _event, _age in zip(sequence_tokens[:start_pos], sequence_ages[:start_pos])
+                if _event in self.meta_information["diagnosis_table"].event.tolist()
+            ]
+            earlier_global_values = [
+                _value
+                for _event, _value in zip(sequence_tokens[:start_pos], sequence_values[:start_pos])
+                if _event in self.meta_information["diagnosis_table"].event.tolist()
+            ]
             start_pos += len(earlier_global_events)
 
             # TODO: this does not check if the pushed back events were global themselves
         else:
             earlier_global_events, earlier_global_ages, earlier_global_values = [], [], []
-            
-        # combine        
-        encoded_tokens = earlier_global_events + encoded_tokens[start_pos:end_pos]            
+
+        # combine
+        encoded_tokens = earlier_global_events + encoded_tokens[start_pos:end_pos]
         sequence_ages = earlier_global_ages + sequence_ages[start_pos:end_pos]
         sequence_values = earlier_global_values + sequence_values[start_pos:end_pos]
 
-        return {"static_covariates": torch.tensor(static_covariates, dtype=torch.float),
-                "tokens": torch.tensor(encoded_tokens),
-                "ages": torch.tensor(sequence_ages) / self.time_scale,
-                "values": torch.tensor(sequence_values),
-               }
+        return {
+            "static_covariates": torch.tensor(static_covariates, dtype=torch.float),
+            "tokens": torch.tensor(encoded_tokens),
+            "ages": torch.tensor(sequence_ages) / self.time_scale,
+            "values": torch.tensor(sequence_values),
+        }
 
     def _parquet_row_to_static_covariates(self, row_df):
         """ From the row loaded from a parquet file, get the encoded static variables. For example, one hot encodings where applicable
@@ -556,48 +698,53 @@ class FoundationalDataset(Dataset):
 
         # one-hot covariates
         for _key in self.meta_information["static_table"].keys():
-            
-            # Dummy variable warning 
-            #    Currently we include a third category for gender (I), which (TODO: double check this..) as an intersex gender. 
+
+            # Dummy variable warning
+            #    Currently we include a third category for gender (I), which (TODO: double check this..) as an intersex gender.
             #    If we drop this we need to be careful of dummy variables as SEX becomes binary.
             X_c = np.array([[row_df[_key]]], dtype=object)
-            Xt_c =  self.static_1hot[_key].transform(X_c).toarray()
+            Xt_c = self.static_1hot[_key].transform(X_c).toarray()
             covariates.append(Xt_c)
 
         # continuous
         # Year-of-birth
         yob_lower, yob_upper = 1900, 2024
-        yob_standardised = (row_df["YEAR_OF_BIRTH"].year - yob_lower ) / (yob_upper - yob_lower)
-        covariates.append(np.asarray(yob_standardised).reshape((1,-1)))
+        yob_standardised = (row_df["YEAR_OF_BIRTH"].year - yob_lower) / (yob_upper - yob_lower)
+        covariates.append(np.asarray(yob_standardised).reshape((1, -1)))
 
         covariates = np.hstack(covariates).squeeze()
 
         return covariates
 
-    def _encode_covariates(self, 
-                           sex,
-                           deprivation,
-                           ethnicity,
-                           year_of_birth
-                           ):
+    def _encode_covariates(
+            self,
+            sex,
+            deprivation,
+            ethnicity,
+            year_of_birth
+    ):
         covariates = []
         for _key, _covariate in zip(["SEX", "IMD", "ETHNICITY"], [sex, deprivation, ethnicity]):
             X_c = np.array([[_covariate]], dtype=object)
-            Xt_c =  self.static_1hot[_key].transform(X_c).toarray()
+            Xt_c = self.static_1hot[_key].transform(X_c).toarray()
             # print(self.static_1hot[_key].categories_)
             covariates.append(Xt_c)
-            
+
         yob_lower, yob_upper = 1900, 2024
-        yob_standardised = (year_of_birth - yob_lower ) / (yob_upper - yob_lower)
-        covariates.append(np.asarray(yob_standardised).reshape((1,-1)))
+        yob_standardised = (year_of_birth - yob_lower) / (yob_upper - yob_lower)
+        covariates.append(np.asarray(yob_standardised).reshape((1, -1)))
 
         covariates = np.hstack(covariates).squeeze()
-        
+
         return torch.tensor(covariates, dtype=torch.float)
 
-    def _decode_covariates(self,
-                           covariates:       torch.tensor         # bsz, nun_covariates
-                          ):
+    def _decode_covariates(
+            self,
+            covariates:       torch.tensor
+    ):
+        """
+        covariates:          shape: (bsz, number of  covariates)
+        """
 
         if len(covariates.shape) == 1:
             covariates = covariates.unsqueeze(0)
@@ -611,14 +758,14 @@ class FoundationalDataset(Dataset):
             features[_key] = self.static_1hot[_key].inverse_transform(covariates_key)[:, 0]
 
         yob_lower, yob_upper = 1900, 2024
-        yob = ( covariates * (yob_upper - yob_lower) ) + yob_lower
+        yob = (covariates * (yob_upper - yob_lower)) + yob_lower
         features["birth_year"] = yob[:, 0]
 
         return features
-        
+
 
 class Collator(object):
-    
+
     def __init__(self, supervised=False, supervised_time_scale=2.0):
         """
         supervised:
@@ -630,44 +777,44 @@ class Collator(object):
         Note: The collator receives the times from `FoundationalDataset()` which are already scaled. The way this is
         coded leads to a multiplicative effect (TODO: put all scaling in the Collator to simplify code and API)
         """
-        
+
         logging.info(f"Creating {'supervised' if supervised else 'unsupervised'} collator for DataModule")
         if supervised:
             logging.info(f"Scaling supervised target ages by a factor of {supervised_time_scale} times the context scale.")
 
         self.supervised = supervised
         self.supervised_time_scale = supervised_time_scale
-        
-    def __call__(self, data:list[dict]):
+
+    def __call__(self, data: list[dict]):
         return self.collate_fn(data)
 
-    def collate_fn(self, data:list[dict]):     
-            r""" 
-            Collect and collate separate dictionaries.
-            
-            During this operation, pad the sequence lengths to the maximum length seen within the batch and tokenize
-            
-            """
-            # Combine individual dictionaries into one
-            #     For dynamic rows (events, values, ages at event, and event types) these become a ragged list of lists.
-            allkeys = set().union(*data)
-            
-            batch_dict = {k: [d[k] for d in data if k in d] for k in allkeys}
-            
-            batch_dict["attention_mask"] = [torch.ones_like(d) for d in batch_dict["tokens"]]
-            
-            worker_batch = {
-                "static_covariates": pad_sequence(batch_dict["static_covariates"], padding_value=0).T,   # not actually padded, will only ever see fixed length sequences
-                "tokens": pad_sequence(batch_dict["tokens"], padding_value=0).T,
-                "ages": pad_sequence(batch_dict["ages"]).T,
-                "values": pad_sequence(batch_dict["values"], padding_value=torch.nan).T,
-                "attention_mask": pad_sequence(batch_dict["attention_mask"]).T
-                }
-    
-            if self.supervised:
-                worker_batch = self.convert_to_supervised(worker_batch, self.supervised_time_scale)
-            
-            return worker_batch
+    def collate_fn(self, data: list[dict]):
+        r"""
+        Collect and collate separate dictionaries.
+
+        During this operation, pad the sequence lengths to the maximum length seen within the batch and tokenize
+
+        """
+        # Combine individual dictionaries into one
+        #     For dynamic rows (events, values, ages at event, and event types) these become a ragged list of lists.
+        allkeys = set().union(*data)
+
+        batch_dict = {k: [d[k] for d in data if k in d] for k in allkeys}
+
+        batch_dict["attention_mask"] = [torch.ones_like(d) for d in batch_dict["tokens"]]
+
+        worker_batch = {
+            "static_covariates": pad_sequence(batch_dict["static_covariates"], padding_value=0).T,   # not actually padded, will only ever see fixed length sequences
+            "tokens": pad_sequence(batch_dict["tokens"], padding_value=0).T,
+            "ages": pad_sequence(batch_dict["ages"]).T,
+            "values": pad_sequence(batch_dict["values"], padding_value=torch.nan).T,
+            "attention_mask": pad_sequence(batch_dict["attention_mask"]).T
+            }
+
+        if self.supervised:
+            worker_batch = self.convert_to_supervised(worker_batch, self.supervised_time_scale)
+
+        return worker_batch
 
     @staticmethod
     def convert_to_supervised(batch, supervised_time_scale):
@@ -733,21 +880,21 @@ class Collator(object):
 
         """
         # batch = copy.deepcopy(batch)
-    
+
         # Check if conversion has already happened
         if "target_token" in batch.keys():
-            # Lightning automatically forwards the batches in the training/test/val loops. 
+            # Lightning automatically forwards the batches in the training/test/val loops.
             #   This will use the default forward kwargs, which may not be correct for
             #   different callbacks (for example, if we want to set is_generation=True).
-            #   Consequently, we may need to re-pass the batch through the forward. As we 
+            #   Consequently, we may need to re-pass the batch through the forward. As we
             #   call this inside the forward in an experiment, then we do not want to repeat this
             #   operation, and so we return early.
             # TODO: a cleaner structure is possible?
             logging.info("""This batch has already been converted to none-causal. Skipping conversion.""")
             return batch
-    
+
         # Check if conversion is possible. If not, raise warning and reduce to samples which can be converted
-        two_events_per_sample = [len(batch["tokens"][i,:].nonzero(as_tuple=False)) >= 2 for i in range(batch["tokens"].shape[0])]
+        two_events_per_sample = [len(batch["tokens"][i, :].nonzero(as_tuple=False)) >= 2 for i in range(batch["tokens"].shape[0])]
         total_bad_samples = len(two_events_per_sample) - sum(two_events_per_sample)
         if not all(two_events_per_sample):
             logging.warning(f"Fine-tuning batch has {total_bad_samples} samples without at least two events.")
@@ -756,25 +903,24 @@ class Collator(object):
                 logging.warning(f"""\tContinuing by removing singular samples, but these should be removed from the dataset.
                                     \t\t Bad sample tokens: {batch["tokens"][not_two_events_per_sample, :5]}
                                     \t\t and corresponding ages {batch["ages"][not_two_events_per_sample, :5]}""")
-                
+
                 for key in batch.keys():
                     batch[key] = batch[key][two_events_per_sample]
             else:
                 raise NotImplementedError
-    
+
         token_matrix = batch["tokens"]
         age_matrix = batch["ages"]
         value_matrix = batch["values"]
         masking_matrix = batch["attention_mask"]
-        
+
         # Create tensors to hold the removed tokens and values
         removed_tokens = torch.zeros(token_matrix.size(0), dtype=token_matrix.dtype)
         removed_ages = torch.zeros(token_matrix.size(0), dtype=value_matrix.dtype)
         removed_values = torch.zeros(token_matrix.size(0), dtype=value_matrix.dtype)
-        
+
         # Iterate over each row
         for i in range(token_matrix.size(0)):
-            # 
             token_row = token_matrix[i]
             age_row = age_matrix[i]
             value_row = value_matrix[i]
@@ -800,8 +946,8 @@ class Collator(object):
         batch["attention_mask"] = masking_matrix
 
         # targets
-        batch["target_token"] = removed_tokens #
-        batch["target_age_delta"] = removed_ages / supervised_time_scale  #.reshape((-1,1))
-        batch["target_value"] = removed_values #.reshape((-1,1))
+        batch["target_token"] = removed_tokens
+        batch["target_age_delta"] = removed_ages / supervised_time_scale  # .reshape((-1,1))
+        batch["target_value"] = removed_values  # .reshape((-1,1))
 
         return batch

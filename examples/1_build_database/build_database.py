@@ -24,8 +24,8 @@ if __name__ == "__main__":
 
     load = False
     if load:
-        logging.warning(f"Load is true, if you want to re-build database set to False")
-    
+        logging.warning("Load is true, if you want to re-build database set to False")
+
     static = Static(PATH_TO_DB, PATH_TO_STATIC, load=load)
     diagnosis = Diagnoses(PATH_TO_DB, PATH_TO_DIAGNOSIS, load=load)
     measurements = Measurements(PATH_TO_DB, PATH_TO_DYNAMIC, load=load)
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     collector.cursor.execute("""SELECT name FROM sqlite_master WHERE type='table';""")
     print(collector.cursor.fetchall())
 
-    collector.cursor.execute( """SELECT * FROM measurement_25_Hydroxyvitamin_D2_level_92_""")
+    collector.cursor.execute("""SELECT * FROM measurement_25_Hydroxyvitamin_D2_level_92_""")
     results = collector.cursor.fetchall()
     for result in results:
         print(result)
