@@ -17,6 +17,7 @@ from torch.nn.utils.rnn import pad_sequence
 from FastEHR.dataloader.dataset.dataset_polars import PolarsDataset
 from FastEHR.dataloader.tokenizers_local import TokenizerBase
 from FastEHR.dataloader.tokenizers_local import NonTabular, Tabular
+from FastEHR.adapters import Adapter
 
 
 class FoundationalDataModule(pl.LightningDataModule, ABC):
@@ -60,6 +61,7 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
             supervised_time_scale:      float = 1.0,
             subsample_training:         Optional[int] = None,
             seed:                       int = 42,
+            adapter:                    Optional[str] = None,
             **kwargs
     ):
         """
@@ -139,10 +141,6 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
 
         self.batch_size = batch_size
         self.min_workers = min_workers
-        self.collate_fn = Collator(
-            supervised=supervised,
-            supervised_time_scale=supervised_time_scale
-        )
 
         # Get the DL friendly representation, either by loading or building
         #  from scratch.
@@ -212,6 +210,13 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
             **dataset_args,
             file_row_count_dict=file_row_count_dicts["val"],
             **kwargs
+        )
+
+        self.adapter = Adapter(adapter, self.tokenizer, supervised) if adapter is not None else None
+        self.collate_fn = Collator(
+            supervised=supervised,
+            supervised_time_scale=supervised_time_scale,
+            adapter=self.adapter,
         )
 
     def standardise(self, event, value):
@@ -526,7 +531,8 @@ class FoundationalDataset(Dataset):
         # Read the corresponding row from the Parquet dataset
         try:
             if Path(file).is_file():
-                # Current version
+                # Current version, which stores the relative path of the data
+                #  file inside the look-up map, relative to where it was created
                 row_df = (
                     pq.read_table(file)
                     .to_pandas()
@@ -535,7 +541,8 @@ class FoundationalDataset(Dataset):
 
             elif Path(self.parquet_path + self.sub_dir + file).is_file():
                 # Old version:
-                # Datasets with dictionaries that only stored the filename
+                # Datasets with dictionaries that stored the filename.
+                #  Arguably this is better and should be restored.
                 logging.warning("This is an older dataset naming convention.")
                 row_df = (
                     pq.read_table(self.parquet_path + self.sub_dir + file)
@@ -766,7 +773,7 @@ class FoundationalDataset(Dataset):
 
 class Collator(object):
 
-    def __init__(self, supervised=False, supervised_time_scale=2.0):
+    def __init__(self, supervised=False, supervised_time_scale=2.0, adapter=None):
         """
         supervised:
             Whether to take the last time point as the target
@@ -784,6 +791,7 @@ class Collator(object):
 
         self.supervised = supervised
         self.supervised_time_scale = supervised_time_scale
+        self.adapter = adapter
 
     def __call__(self, data: list[dict]):
         return self.collate_fn(data)
@@ -795,16 +803,20 @@ class Collator(object):
         During this operation, pad the sequence lengths to the maximum length seen within the batch and tokenize
 
         """
+        if self.adapter:
+            data = self.adapter(data)
+
         # Combine individual dictionaries into one
         #     For dynamic rows (events, values, ages at event, and event types) these become a ragged list of lists.
         allkeys = set().union(*data)
-
         batch_dict = {k: [d[k] for d in data if k in d] for k in allkeys}
 
         batch_dict["attention_mask"] = [torch.ones_like(d) for d in batch_dict["tokens"]]
 
+        # pad
+        # static_covariates not actually padded, will only ever see fixed length sequences
         worker_batch = {
-            "static_covariates": pad_sequence(batch_dict["static_covariates"], padding_value=0).T,   # not actually padded, will only ever see fixed length sequences
+            "static_covariates": pad_sequence(batch_dict["static_covariates"], padding_value=0).T,
             "tokens": pad_sequence(batch_dict["tokens"], padding_value=0).T,
             "ages": pad_sequence(batch_dict["ages"]).T,
             "values": pad_sequence(batch_dict["values"], padding_value=torch.nan).T,

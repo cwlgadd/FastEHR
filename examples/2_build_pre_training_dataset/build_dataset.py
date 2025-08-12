@@ -27,7 +27,6 @@ if __name__ == "__main__":
                                 drop_empty_dynamic=True,
                                 tokenizer="tabular",
                                 practice_inclusion_conditions=["COUNTRY = 'E'"],
-                                overwrite_meta_information=None,
                                 num_threads=num_threads
                                 )
 

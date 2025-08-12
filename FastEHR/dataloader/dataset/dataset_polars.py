@@ -296,6 +296,7 @@ class PolarsDataset:
 
             desc = f"Thread generating parquet for {len(split_ids)} practices"
             total_samples = 0
+            chunk_name = "empty generator"
             for chunk_name, lazy_table_frames_dict in tqdm(practice_generator, total=len(split_ids), desc=desc):
 
                 logging.debug(f"Processing {chunk_name}")
@@ -306,9 +307,9 @@ class PolarsDataset:
                 # Collect the lazy Polars frame, materializing the batch
                 #   include row count so we can filter when reading from file
                 df = lazy_batch.collect().with_row_count().to_pandas()  # offset=total_samples
-                total_samples = len(df.index)
+                samples = len(df.index)
 
-                if total_samples > 0:
+                if samples > 0:
                     # Convert row count to lower cardinality bins for efficient partitioning
                     # ... the smaller the window the more files created + storage space used, and the longer this takes to run
                     # ... but the faster the read efficiency.
@@ -318,7 +319,8 @@ class PolarsDataset:
                     table = pa.Table.from_pandas(df)
                     pq.write_to_dataset(table, root_path=save_path, partition_cols=['COUNTRY', 'HEALTH_AUTH', 'PRACTICE_ID', 'CHUNK'])
 
-                    logging.debug(f'Saved {total_samples} rows for chunk {chunk_name}')
+                    logging.debug(f'Saved {samples} rows for chunk {chunk_name}')
+                    total_samples += samples
 
         except Exception as e:
             logging.exception(f"Error processing {chunk_name}: {e}")
