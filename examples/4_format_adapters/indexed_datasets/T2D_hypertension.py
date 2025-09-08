@@ -9,8 +9,6 @@ from FastEHR.adapters.BEHRT import BehrtDFBuilder
 
 if __name__ == "__main__":
 
-    # TODO: add targets to built dataframe
-
     torch.manual_seed(1337)
     logging.basicConfig(level=logging.INFO)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -58,7 +56,11 @@ if __name__ == "__main__":
     chunks = []
     for idx_batch, batch in enumerate(dm.train_dataloader()):
 
-        builder.add_batch(batch["tokens"], batch["ages"])
+        builder.add_batch(batch["tokens"], batch["ages"],
+                          target_event=batch["target_token"],
+                          target_time=batch["target_age_delta"],
+                          target_value=batch["target_value"],
+                          )
 
         if idx_batch % 10 == 0:
             df_chunk = builder.flush()
@@ -77,8 +79,9 @@ if __name__ == "__main__":
         df.to_parquet(data_dir + "adapted/BEHRT/T2D_hypertension/dataset.parquet", index=False)
 
         print(len(df))
-        print(df["patid"][0])
-        print(df["caliber_id"][0])
-        print(df["age"][0])
+        print(df.head())
+        # print(df["patid"][0])
+        # print(df["caliber_id"][0])
+        # print(df["age"][0])
     else:
         logging.warning("No valid data")

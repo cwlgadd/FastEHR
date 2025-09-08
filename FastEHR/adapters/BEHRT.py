@@ -201,7 +201,10 @@ class BehrtDFBuilder:
             return False  # too short, skip
         return True
 
-    def add_batch(self, tokens_batch, ages_batch):
+    def add_batch(self, tokens_batch, ages_batch,
+                  target_event=None, target_time=None,
+                  target_value=None
+                  ):
         """
         Add a batch of sequences to the builder.
 
@@ -210,12 +213,34 @@ class BehrtDFBuilder:
         tokens_batch : torch.Tensor
             Shape [B, T], each element is a string token (or int if using IDs).
         ages_batch : torch.Tensor
-            Shape [B, T], integer ages aligned with tokens_batch.
+            Shape [B, T], ages aligned with tokens_batch.
+        target_event : optional torch.Tensor
+            Shape [B], each element is string token of the outcome event (or int if using IDs)
+        target_time : optional torch.Tensor
+            Shape [B], each element is time-to-event from last tokens_batch token to the outcome
+        target_value : optional torch.Tensor
+            Shape [B], each element is value of an outcome event
         """
+        # Convert to list of samples
         tokens_batch = tokens_batch.tolist()
         ages_batch = ages_batch.tolist()
+        n_samples = len(tokens_batch)
+        assert len(ages_batch) == n_samples
+        # If optional outcomes are included then do the same
+        if target_event is not None and target_time is not None:
+            target_event = target_event.tolist()
+            target_time = target_time.tolist()
+            assert len(target_event) == n_samples
+            assert len(target_time) == n_samples
+        if target_value is not None:
+            target_value = target_value.tolist()
+            assert len(target_value) == n_samples
 
-        for token_ids, ages in zip(tokens_batch, ages_batch):
+        for sample_idx in range(n_samples):
+
+            token_ids = tokens_batch[sample_idx]
+            ages = ages_batch[sample_idx]
+
             token_ids, ages = self._strip_padding(token_ids, ages)
 
             if not self._validate(token_ids, ages):
@@ -224,11 +249,27 @@ class BehrtDFBuilder:
             # Convert IDs -> strings for storage
             tokens_str = [self._itostr.get(tid, "UNK") for tid in token_ids]
 
-            self.rows.append({
+            row_dict = {
                 "patid": self._new_id(),
                 "caliber_id": tokens_str,
                 "age": ages
-            })
+            }
+            if target_event is not None and target_time is not None:
+                row_dict.update(
+                    {
+                        "target_event": self._itostr.get(target_event[sample_idx], "UNK"),
+                        "target_time": target_time[sample_idx]
+                     }
+                )
+            if target_value is not None:
+                row_dict.update(
+                    {
+                        "target_value": target_value[sample_idx]
+                    }
+                )
+
+            # Add sample
+            self.rows.append(row_dict)
 
     def flush(self) -> pd.DataFrame:
         """
@@ -237,6 +278,6 @@ class BehrtDFBuilder:
         """
         if not self.rows:
             return pd.DataFrame(columns=["patid", "caliber_id", "age"])
-        df = pd.DataFrame(self.rows, columns=["patid", "caliber_id", "age"])
+        df = pd.DataFrame(self.rows)
         self.rows.clear()
         return df

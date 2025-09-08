@@ -75,8 +75,9 @@ if __name__ == "__main__":
         df.to_parquet(data_dir + "adapted/BEHRT/pretrain/dataset.parquet", index=False)
 
         print(len(df))
-        print(df["patid"][0])
-        print(df["caliber_id"][0])
-        print(df["age"][0])
+        print(df.head(3))
+        # print(df["patid"][0])
+        # print(df["caliber_id"][0])
+        # print(df["age"][0])
     else:
         logging.warning("No valid data")
