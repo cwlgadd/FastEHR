@@ -60,3 +60,7 @@ docs/_build/
 **/*.out
 
 /examples/3_build_fine_tuning_datasets/old/
+
+docs/autoapi/
+docs/_build/
+.doctrees

@@ -65,77 +65,50 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
             **kwargs
     ):
         """
-        Initializes the `FoundationalDataModule`, a PyTorch Lightning
-        DataModule for foundational models.
+        Initialize the `FoundationalDataModule`, a PyTorch Lightning DataModule for foundational models.
 
-        This module handles data loading, preprocessing, and batching for
-         training, validation, and testing. It supports both supervised
-         and unsupervised learning tasks and integrates tokenization,
-          meta-information loading, and dataset preparation.
+        This module handles data loading, preprocessing, and batching for training, validation, and testing.
+        It supports both supervised and unsupervised learning tasks and integrates tokenization,
+        meta-information loading, and dataset preparation.
 
-        Parameters
-        ----------
-        path_to_db : str
-            Full path to the SQLite database folder.
+        :param path_to_db: Full path to the SQLite database folder.
+        :type path_to_db: str
+        :param path_to_ds: Full path to the preprocessed dataset folder, either for loading or saving data.
+        :type path_to_ds: str
+        :param load: If ``True``, loads preprocessed dataset from Parquet files. If ``False``, processes raw
+            SQLite data and saves it as Parquet files.
+        :type load: bool
+        :param tokenizer: Which tokenizer to use. ``"tabular"`` uses the Tabular tokenizer; any other string
+            defaults to NonTabular.
+        :type tokenizer: str, optional
+        :param batch_size: Number of samples per batch for the DataLoader (default ``64``).
+        :type batch_size: int, optional
+        :param min_workers: Minimum number of workers used for data loading (default ``1``).
+        :type min_workers: int, optional
+        :param overwrite_practice_ids: Path to a file containing new practice-ID allocations for
+            train/validation/test splits. Prevents data leakage when creating fine-tuning datasets.
+        :type overwrite_practice_ids: str | None, optional
+        :param overwrite_meta_information: Path to an existing meta-information pickle file. If provided,
+            prevents redundant preprocessing of meta-information.
+        :type overwrite_meta_information: str | None, optional
+        :param supervised: If ``True``, enables supervised training mode (default ``False``).
+        :type supervised: bool, optional
+        :param supervised_time_scale: Scaling factor applied to supervised target times produced in the
+            collator (default: 10 years). This multiplies the ``time_scale`` in ``FoundationalDataset``.
+        :type supervised_time_scale: float, optional
+        :param subsample_training: If specified, reduces the training dataset to a random subset of this size.
+        :type subsample_training: int | None, optional
+        :param seed: Random seed used when subsampling the training dataset.
+        :type seed: int | None, optional
+        :param kwargs: Additional keyword arguments passed to ``PolarsDataset.fit()``.
+        :type kwargs: Any
 
-        path_to_ds : str
-            Full path to the preprocessed dataset folder, either for loading
-            or saving data.
-
-        load : bool
-            If `True`, loads preprocessed dataset from Parquet files.
-            If `False`, processes raw SQLite data and saves it as Parquet
-             files.
-
-        tokenizer : str, optional, default="tabular"
-            Specifies which tokenizer to use.
-            - `"tabular"`: Uses `Tabular` tokenizer.
-            - Any other string defaults to `NonTabular`.
-
-        batch_size : int, optional, default=64
-            Number of samples per batch for DataLoader.
-
-        min_workers : int, optional, default=1
-            Minimum number of workers used for data loading.
-
-        overwrite_practice_ids : str, optional
-            Path to a file containing new practice ID allocations for
-             train/test/validation splits. This prevents data leakage when
-             creating fine-tuning datasets.
-
-        overwrite_meta_information : str, optional
-            Path to an existing meta-information pickle file. If provided,
-             it prevents redundant preprocessing of meta-information.
-
-        supervised : bool, optional, default=False
-            If `True`, enables supervised training mode.
-
-        supervised_time_scale: float, optional, default 3650.0
-            The scaling factor applied to any supervised target times produced
-             in the Collator (default: 10 years). This is multiplicative with
-             the time_scale in FoundationalDataset.
-
-        subsample_training : int, optional
-            If specified, reduces the training dataset to a random subset of
-             this size.
-
-        seed : int, optional
-            If specified, the seed used for reducing the training dataset to a
-             random subset of this size.
-
-        **kwargs
-            Additional keyword arguments passed to PolarsDataset.fit()
-
-        Notes
-        -----
-        - Loads tokenizer vocabulary from meta-information and initializes
-           dataset splits.
+        Notes:
+        - Loads tokenizer vocabulary from meta-information and initializes dataset splits.
         - Supports dataset reprocessing or direct loading from Parquet files.
-        - Uses `Collator` for batch collation, which supports both causal
-           and non-causal tasks.
-        - Handles training, validation, and test dataset creation with
-           tokenization.
-        """
+        - Uses ``Collator`` for batch collation (supports self-supervised and supervised tasks).
+        - Handles training, validation, and test dataset creation with tokenization.
+        """	     
 
         super().__init__()
 
@@ -249,7 +222,8 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
         return self.train_set.tokenizer.decode(sequence)
 
     def train_dataloader(self):
-        """"""
+        """
+        """
         return DataLoader(
             dataset=self.train_set,
             batch_size=self.batch_size,
@@ -260,7 +234,8 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
         )
 
     def val_dataloader(self):
-        """"""
+        """
+        """
         return DataLoader(
             dataset=self.val_set,
             batch_size=self.batch_size,
@@ -271,7 +246,8 @@ class FoundationalDataModule(pl.LightningDataModule, ABC):
         )
 
     def test_dataloader(self):
-        """"""
+        """
+        """
         return DataLoader(
             dataset=self.test_set,
             batch_size=self.batch_size,

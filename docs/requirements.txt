@@ -1,0 +1,5 @@
+sphinx>=7.4
+furo>=2024.1.29
+sphinx-autoapi>=3.0
+sphinx-paramlinks>=0.6
+

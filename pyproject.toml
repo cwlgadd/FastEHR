@@ -1,10 +1,28 @@
 [build-system]
-requires = ["setuptools"]
+# Tells pip how to build your package.
+# setuptools>=64 for modern PEP 621 support.
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "FastEHR"
-version = "0.0.1"
+# The installable package's metadata.
+name = "FastEHR"				# What users would ``pip install``
+version = "0.0.1"				# Package version
+description = "Fast pipelines and tooling for EHR data."
+readme = "README.md"				# Shown on package indexes; useful context for docs users
+requires-python = ">=3.10"
 
-[tool.setuptools]
-packages = ["FastEHR.database", "FastEHR.dataloader"]
+[tool.setuptools.packages.find]
+# Automatically include the main package and its subpackages.
+# For example, this expects a directory named "FastEHR/" with __init__.py files.
+where = ["."]
+include = ["FastEHR*"]
+
+[project.optional-dependencies]
+# An *extra* named "docs". RTD (and contributors) can install with: `.[docs]`
+# so every environment uses the same doc toolchain.
+docs = [
+  "sphinx>=7.4,<8",				# Sphinx is the documentation builder RTD uses
+  "sphinx-rtd-theme",				# Read The Docs theme
+  "myst-parser",				# For writing docs in Markdown as well as reST.
+]

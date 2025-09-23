@@ -10,30 +10,26 @@ class ConvertToBEHRT(object):
     Convert tokenized FastEHR patient sequences into BEHRT-compatible format.
 
     This adapter:
-    1. Extends an existing FastEHR tokenizer to include BEHRT's required special tokens.
-    2. Converts sequences of events grouped by visit into the token/age format
-       expected by BEHRT, adding `[CLS]` at the start and `[SEP]` between visits.
-    3. Retains values (despite not being used in BEHRT).
-    4. Removes baseline information (e.g. ethnicity, gender) as this is not used by BEHRT.
+    
+    - Extends an existing FastEHR tokenizer to include BEHRT's required special tokens.
+    - Converts sequences of events grouped by visit into the token/age format
+      expected by BEHRT, adding `[CLS]` at the start and `[SEP]` between visits.
+    - Retains values (despite not being used in BEHRT).
+    - Removes baseline information (e.g. ethnicity, gender) as this is not used by BEHRT.
 
     Attributes
-    ----------
-    special_tokens : dict[str, int]
-        Mapping of BEHRT special tokens to fixed integer IDs:
-        PAD=0, UNK=1, SEP=2, CLS=3, MASK=4.
-    fastehr_tokenizer : object
-        The original FastEHR tokenizer instance passed at initialization.
-    supervised : bool
-        Whether the data conversion is for a supervised downstream task.
-        This determines how the SEP token is appended at the end.
-    tokenizer : dict[str, int]
-        Token-to-index mapping that includes both BEHRT special tokens and
-        all codes from the original FastEHR tokenizer.
+ 
+    - **special_tokens** (dict[str, int]): Mapping of BEHRT special tokens to fixed IDs:
+      PAD=0, UNK=1, SEP=2, CLS=3, MASK=4.
+    - **fastehr_tokenizer** (object): Original FastEHR tokenizer instance passed at init.
+    - **supervised** (bool): Whether conversion targets a supervised task (affects final SEP).
+    - **tokenizer** (dict[str, int]): Token to index mapping incl. BEHRT specials and original codes.
 
-    Example
-    -------
-    >>> converter = ConvertToBEHRT(fastehr_tokenizer)
-    >>> processed_list_of_patient_dicts = converter(list_of_patient_dicts)
+
+    Example::
+
+        >>> converter = ConvertToBEHRT(fastehr_tokenizer)
+        >>> processed_list_of_patient_dicts = converter(list_of_patient_dicts)
     """
     special_tokens = {"PAD": 0,
                       "UNK": 1,
@@ -208,19 +204,20 @@ class BehrtDFBuilder:
         """
         Add a batch of sequences to the builder.
 
-        Parameters
-        ----------
-        tokens_batch : torch.Tensor
-            Shape [B, T], each element is a string token (or int if using IDs).
-        ages_batch : torch.Tensor
-            Shape [B, T], ages aligned with tokens_batch.
-        target_event : optional torch.Tensor
-            Shape [B], each element is string token of the outcome event (or int if using IDs)
-        target_time : optional torch.Tensor
-            Shape [B], each element is time-to-event from last tokens_batch token to the outcome
-        target_value : optional torch.Tensor
-            Shape [B], each element is value of an outcome event
-        """
+        :param tokens_batch: Batch of token sequences; each element is a string token
+            (or an integer ID).
+        :type tokens_batch: torch.Tensor, shape ``[B, T]``
+        :param ages_batch: Ages aligned with ``tokens_batch``.
+        :type ages_batch: torch.Tensor, shape ``[B, T]``
+        :param target_event: Outcome event token/ID for each sequence, or ``None``.
+        :type target_event: torch.Tensor or None, shape ``[B]``
+        :param target_time: Time-to-event measured from the last token in ``tokens_batch``,
+             or ``None``.
+        :type target_time: torch.Tensor or None, shape ``[B]``
+        :param target_value: Value associated with the outcome event, or ``None``.
+        :type target_value: torch.Tensor or None, shape ``[B]``
+        
+        """        
         # Convert to list of samples
         tokens_batch = tokens_batch.tolist()
         ages_batch = ages_batch.tolist()

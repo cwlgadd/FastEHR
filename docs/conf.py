@@ -2,13 +2,15 @@
 #
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
+#
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-
-import os
-import sys
-sys.path.insert(0, os.path.abspath("../FastEHR"))
+#
+# -- General configuration ---------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+#
+# -- Options for HTML output -------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 
 project = 'FastEHR'
@@ -16,20 +18,47 @@ copyright = '2025, Charles Gadd'
 author = 'Charles Gadd'
 release = '0.0.1'
 
-# -- General configuration ---------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+# HTML theme
+html_theme = 'furo'
 
-extensions = [
-        "sphinx.ext.todo",
-        "sphinx.ext.viewcode",
-        "sphinx.ext.autodoc",
-]
+# Ensure stale stubs are replaced
+autosummary_generate = True
+autosummary_generate_overwrite = True
+#autodoc_default_options = {
+#    "members": True,
+#    "inherited-members": True,
+#    "show-inheritance": True,
+#    "undoc-members": True,   # list items even without docstrings
+#}
+#autodoc_typehints = "description"         # show hints nicely in the doc body
+#python_use_unqualified_type_names = True  # cleaner type names
 
-templates_path = ['_templates']
+#
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-# -- Options for HTML output -------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
+extensions = [
+    # "myst_parser",              # for writing docs in Markdown
+    # "sphinx.ext.autodoc",       # pull docstrings
+    # "sphinx.ext.autosummary",	 # generate API stub pages
+    "sphinx.ext.napoleon",      # Google/NumPy-style docstrings
+    # "sphinx.ext.intersphinx",
+    # "sphinx.ext.viewcode",
+    "sphinx_paramlinks",
+    "autoapi.extension",
+]
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+# Point AutoAPI at your package folder (adjust if needed)
+autoapi_type = "python"
+autoapi_dirs = ["../FastEHR"]
+autoapi_add_toctree_entry = True
+autoapi_member_order = "bysource"
+autoapi_options = ["members", "undoc-members", "show-module-summary"]
+autoapi_python_class_content = "both"  # class docstring + __init__ docstring
+autoapi_keep_files = False             # For debugging
+
+
+# For future refactoring
+napoleon_google_docstring = False
+napoleon_numpy_docstring = False
+
+
