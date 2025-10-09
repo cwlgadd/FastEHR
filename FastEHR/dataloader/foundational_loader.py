@@ -415,6 +415,9 @@ class FoundationalDataset(Dataset):
         np.random.seed(self.seed)
         logging.info(f"Set seed to {self.seed}")
 
+        # Add a collection of warnings already raised so we can avoid repeating. Temporary fix.
+        self.warnings_raised = []
+        
         # Create a PyArrow dataset directly from the PolarsDataset saved hive
         # partitioned dataset
         # NOTE:   This can take some time to initialise, but using the API is
@@ -519,7 +522,10 @@ class FoundationalDataset(Dataset):
                 # Old version:
                 # Datasets with dictionaries that stored the filename.
                 #  Arguably this is better and should be restored.
-                logging.warning("This is an older dataset naming convention.")
+                if "naming_convention" not in self.warnings_raised:
+                    logging.warning("This is an older dataset naming convention2.")
+                    self.warnings_raised.append("naming_convention")
+            
                 row_df = (
                     pq.read_table(self.parquet_path + self.sub_dir + file)
                     .to_pandas()
